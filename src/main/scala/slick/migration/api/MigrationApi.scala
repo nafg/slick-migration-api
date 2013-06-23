@@ -77,7 +77,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   trait Migration {
-    def apply()(implicit session: driver.backend.Session): Unit
+    def apply()(implicit session: driver.simple.Session): Unit
   }
 
   object Migration {
@@ -106,7 +106,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class MigrationSeq(migrations: Migration*) extends Migration {
-    final def apply()(implicit session: driver.backend.Session) = migrations foreach (_())
+    final def apply()(implicit session: driver.simple.Session) = migrations foreach (_())
   }
 
   class ReversibleMigrationSeq(override val migrations: ReversibleMigration*) extends MigrationSeq(migrations: _*) with ReversibleMigration {
@@ -115,7 +115,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
 
   trait SqlMigration extends Migration {
     def sql: String
-    def apply()(implicit session: driver.backend.Session) = session.withStatement()(_ execute sql)
+    def apply()(implicit session: driver.simple.Session) = session.withStatement()(_ execute sql)
   }
 
   object SqlMigration {
@@ -130,7 +130,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     class Wrapper(additional: ReversibleMigrationSeq) extends CreateTableBase[T] {
       def table = outer.table
       def all = outer & additional
-      def apply()(implicit session: driver.backend.Session) = all()
+      def apply()(implicit session: driver.simple.Session) = all()
       def reverse = all.reverse
     }
     def table: T
@@ -151,6 +151,4 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   case class DropTable(table: TableNode) extends SqlMigration {
     def sql = dialect.dropTable(table)
   }
-
 }
-
