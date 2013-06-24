@@ -55,7 +55,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     val rms1: ReversibleMigrationSeq = rms // verify the type
     rms should equal (new ReversibleMigrationSeq(rm, rm, rm))
   }
-  test("test") { implicit fix =>
+  test("CreateTable, DropTable") { implicit fix =>
     import fix._
     import driver.simple._
 

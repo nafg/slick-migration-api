@@ -5,8 +5,13 @@ import driver._
 import lifted._
 import ast._
 
-abstract class Dialect[D <: JdbcDriver](driver: D) {
+class Dialect[D <: JdbcDriver](driver: D) {
   import driver._
+
+  protected def fieldSym(node: Node): Option[FieldSymbol] = node match {
+    case Select(_, f: FieldSymbol) => Some(f)
+    case _                         => None
+  }
 
   def quoteIdentifier(id: String): String = {
     val s = new StringBuilder(id.length + 4) append '"'
@@ -19,20 +24,14 @@ abstract class Dialect[D <: JdbcDriver](driver: D) {
     case None => quoteIdentifier(t.tableName)
   }
 
-  def createTable(table: TableNode, columns: Seq[ColumnInfo]): String
+  protected def quotedColumnNames(ns: Seq[Node]) = ns.flatMap(fieldSym).map(fs => quoteIdentifier(fs.name))
 
-  def columnSql(ci: ColumnInfo, includePk: Boolean = true): String
-
-  def dropTable(table: TableNode): String
-}
-
-class DefaultDialect[D <: JdbcDriver](driver: D) extends Dialect[D](driver) {
-  def createTable(table: TableNode, columns: Seq[ColumnInfo]) =
+  def createTable(table: TableNode, columns: Seq[ColumnInfo]): String =
     s"""create table ${ quoteTableName(table) } (
       | ${ columns map { columnSql(_, true) } mkString ", " }
       |)""".stripMargin
 
-  def columnSql(ci: ColumnInfo, includePk: Boolean = true) = {
+  def columnSql(ci: ColumnInfo, includePk: Boolean = true): String = {
     def name = quoteIdentifier(ci.name)
     def typ = if(ci.autoInc) "SERIAL" else ci.sqlType
     def default = ci.default.map(" DEFAULT " + _).getOrElse("")
@@ -41,15 +40,26 @@ class DefaultDialect[D <: JdbcDriver](driver: D) extends Dialect[D](driver) {
     s"$name $typ$default$notNull$pk"
   }
 
-  def dropTable(table: TableNode) =
+  def dropTable(table: TableNode): String =
     s"drop table ${ quoteTableName(table) }"
+
+  def createForeignKey(sourceTable: TableNode, name: String, sourceColumns: Seq[Node], targetTable: TableNode, targetColumns: Seq[Node], onUpdate: ForeignKeyAction, onDelete: ForeignKeyAction): String =
+    s"""alter table ${ quoteTableName(sourceTable) }
+      | add constraint ${ quoteIdentifier(name) }
+      | foreign key (${ quotedColumnNames(sourceColumns) mkString ", " })
+      | references ${ quoteTableName(targetTable) }
+      | (${ quotedColumnNames(targetColumns) mkString ", " })
+      | on update ${ onUpdate.action } on delete ${ onDelete.action }""".stripMargin
+
+  def dropForeignKey(sourceTable: TableNode, name: String) =
+    s"alter table ${ quoteTableName(sourceTable) } drop constraint ${ quoteIdentifier(name) }"
 }
 
 case class ColumnInfo(name: String, sqlType: String, notNull: Boolean, autoInc: Boolean, isPk: Boolean, default: Option[String])
 
 class HasDialect[D <: JdbcDriver](val f: D => Dialect[D])
 object HasDialect {
-  implicit def default[D <: JdbcDriver]: HasDialect[D] = new HasDialect(d => new DefaultDialect(d))
+  implicit def default[D <: JdbcDriver]: HasDialect[D] = new HasDialect(d => new Dialect(d))
 }
 
 class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect[D]) {
@@ -135,7 +145,9 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     }
     def table: T
 
-    // def withForeignKeys(fks: (T => ForeignKeyQuery[_ <: TableNode, _])*) = new Wrapper(new ReversibleMigrationSeq(fks.map(f => CreateForeignKey(f(table)))))
+    def withForeignKeys(fks: (T => ForeignKeyQuery[_ <: TableNode, _])*) = new Wrapper(
+      new ReversibleMigrationSeq(fks.map(f => CreateForeignKey(f(table))): _*)
+    )
     //TODO withPrimaryKeys
     //TODO withIndexes
   }
@@ -150,5 +162,30 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
 
   case class DropTable(table: TableNode) extends SqlMigration {
     def sql = dialect.dropTable(table)
+  }
+
+  object CreateForeignKey {
+    def apply(fkq: ForeignKeyQuery[_ <: TableNode, _]): ReversibleMigrationSeq =
+     new ReversibleMigrationSeq(fkq.fks.map(new CreateForeignKey(_)): _*)
+  }
+  case class CreateForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
+    def sql = fk.sourceTable match {
+      case sourceTable: TableNode =>
+        dialect.createForeignKey(sourceTable, fk.name, fk.linearizedSourceColumns, fk.targetTable, fk.linearizedTargetColumnsForOriginalTargetTable, fk.onUpdate, fk.onDelete)
+    }
+
+    def reverse = DropForeignKey(fk)
+  }
+
+  object DropForeignKey {
+    def apply(fkq: ForeignKeyQuery[_ <: TableNode, _]): ReversibleMigrationSeq =
+     new ReversibleMigrationSeq(fkq.fks.map(new DropForeignKey(_)): _*)
+  }
+  case class DropForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
+    def sql = fk.sourceTable match {
+      case sourceTable: TableNode =>
+        dialect.dropForeignKey(sourceTable, fk.name)
+    }
+    def reverse = CreateForeignKey(fk)
   }
 }
