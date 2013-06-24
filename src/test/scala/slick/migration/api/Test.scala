@@ -60,7 +60,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     import driver.simple._
 
     object table1 extends Table[Long]("table1") {
-      def id = column[Long]("id")
+      def id = column[Long]("id", O.NotNull, O.AutoInc)
       def * = id
     }
 
@@ -75,7 +75,12 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     val after = tables.list
 
     inside(after filterNot before.contains) {
-      case MTable(MQName(_, _, table1.tableName), "TABLE", _, _, _, _) :: Nil =>
+      case (table @ MTable(MQName(_, _, table1.tableName), "TABLE", _, _, _, _)) :: Nil =>
+        table.getColumns.list.map {
+          case col => (col.column, col.typeName, col.nullable, col.isAutoInc)
+        } should equal (List(
+          ("id", "BIGINT", Some(false), Some(true))
+        ))
     }
 
     createTable.reverse should equal (DropTable(table1))
