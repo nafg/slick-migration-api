@@ -92,7 +92,10 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def withForeignKeys(fks: (T => ForeignKeyQuery[_ <: TableNode, _])*) = new Wrapper(
       new ReversibleMigrationSeq(fks.map(f => CreateForeignKey(f(table))): _*)
     )
-    //TODO withPrimaryKeys
+
+    def withPrimaryKeys(pks: (T => PrimaryKey)*) = new Wrapper(
+      new ReversibleMigrationSeq(pks.map(f => CreatePrimaryKey(table)(f)): _*)
+    )
     //TODO withIndexes
   }
 
@@ -132,4 +135,18 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     }
     def reverse = CreateForeignKey(fk)
   }
+
+  case class CreatePrimaryKey[T <: TableNode](table: T)(key: T => PrimaryKey) extends SqlMigration with ReversibleMigration {
+    def sql = {
+      val pk = key(table)
+      dialect.createPrimaryKey(table, pk.name, pk.columns flatMap fieldSym)
+    }
+    def reverse = DropPrimaryKey(table)(key)
+  }
+
+  case class DropPrimaryKey[T <: TableNode](table: T)(key: T => PrimaryKey) extends SqlMigration with ReversibleMigration {
+    def sql = dialect.dropPrimaryKey(table, key(table).name)
+    def reverse = CreatePrimaryKey(table)(key)
+  }
+
 }

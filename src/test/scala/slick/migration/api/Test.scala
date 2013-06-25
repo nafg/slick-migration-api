@@ -97,6 +97,40 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     tables.list should equal (before)
   }
 
+  test("CreatePrimaryKey, DropPrimaryKey") { implicit fix =>
+    import fix._
+    import driver.simple._
+
+    object table1 extends Table[(Long, String)]("table1") {
+      def id = column[Long]("id")
+      def stringId = column[String]("stringId")
+      def * = id ~ stringId
+      def pk = primaryKey("pk", id ~ stringId)
+    }
+
+    def pkList = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getPrimaryKeys.list)
+    def pks = pkList
+      .groupBy(_.pkName)
+      .mapValues {
+        _ collect { case MPrimaryKey(MQName(_, _, "table1"), col, seq, _) => (seq, col) }
+      }
+
+    CreateTable(table1)(_.id, _.stringId)()
+
+    val before = pks
+
+    before.get(Some("pk")) should equal (None)
+
+    val createPrimaryKey = CreatePrimaryKey(table1)(_.pk)
+    createPrimaryKey()
+
+    pks(Some("pk")) should equal (List(1 -> "id", 2 -> "stringId"))
+
+    createPrimaryKey.reverse()
+
+    pks should equal (before)
+  }
+
   test("CreateForeignKey, DropForeignKey") { implicit fix =>
     import fix._
     import driver.simple._

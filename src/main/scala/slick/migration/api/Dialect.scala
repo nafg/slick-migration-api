@@ -27,11 +27,6 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   protected def quotedColumnNames(ns: Seq[FieldSymbol]) = ns.map(fs => quoteIdentifier(fs.name))
 
-  def createTable(table: TableNode, columns: Seq[ColumnInfo]): String =
-    s"""create table ${ quoteTableName(table) } (
-      | ${ columns map { columnSql(_, true) } mkString ", " }
-      |)""".stripMargin
-
   def columnSql(ci: ColumnInfo, includePk: Boolean = true): String = {
     def name = quoteIdentifier(ci.name)
     def typ = if(ci.autoInc) "SERIAL" else ci.sqlType
@@ -41,17 +36,36 @@ class Dialect[D <: JdbcDriver](driver: D) {
     s"$name $typ$default$notNull$pk"
   }
 
+  def columnList(columns: Seq[FieldSymbol]) =
+    quotedColumnNames(columns).mkString("(", ", ", ")")
+
+  def createTable(table: TableNode, columns: Seq[ColumnInfo]): String =
+    s"""create table ${ quoteTableName(table) } (
+      | ${ columns map { columnSql(_, true) } mkString ", " }
+      |)""".stripMargin
+
   def dropTable(table: TableNode): String =
     s"drop table ${ quoteTableName(table) }"
 
   def createForeignKey(sourceTable: TableNode, name: String, sourceColumns: Seq[FieldSymbol], targetTable: TableNode, targetColumns: Seq[FieldSymbol], onUpdate: ForeignKeyAction, onDelete: ForeignKeyAction): String =
     s"""alter table ${ quoteTableName(sourceTable) }
       | add constraint ${ quoteIdentifier(name) }
-      | foreign key (${ quotedColumnNames(sourceColumns) mkString ", " })
+      | foreign key ${ columnList(sourceColumns) }
       | references ${ quoteTableName(targetTable) }
       | (${ quotedColumnNames(targetColumns) mkString ", " })
       | on update ${ onUpdate.action } on delete ${ onDelete.action }""".stripMargin
 
+  def dropConstraint(table: TableNode, name: String) =
+    s"alter table ${ quoteTableName(table) } drop constraint ${ quoteIdentifier(name) }"
+
   def dropForeignKey(sourceTable: TableNode, name: String) =
-    s"alter table ${ quoteTableName(sourceTable) } drop constraint ${ quoteIdentifier(name) }"
+    dropConstraint(sourceTable, name)
+
+  def createPrimaryKey(table: TableNode, name: String, columns: Seq[FieldSymbol]) =
+    s"""alter table ${ quoteTableName(table) }
+      | add constraint ${ quoteIdentifier(name) } primary key
+      | ${ columnList(columns) }""".stripMargin
+
+  def dropPrimaryKey(table: TableNode, name: String) =
+    dropConstraint(table, name)
 }
