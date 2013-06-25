@@ -5,9 +5,7 @@ import driver.JdbcDriver
 import lifted._
 import ast._
 
-
 case class ColumnInfo(name: String, sqlType: String, notNull: Boolean, autoInc: Boolean, isPk: Boolean, default: Option[String])
-
 
 class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect[D]) {
 
@@ -22,7 +20,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
       case (ci, ColumnOption.Nullable)   => ci.copy(notNull = false)
       case (ci, ColumnOption.AutoInc)    => ci.copy(autoInc = true)
       case (ci, ColumnOption.PrimaryKey) => ci.copy(isPk = true)
-      case (ci, ColumnOption.Default(v)) => ci.copy(default = Some(ti/*.asInstanceOf[TypeMapperDelegate[Any]]*/.valueToSQLLiteral(v)))
+      case (ci, ColumnOption.Default(v)) => ci.copy(default = Some(ti.valueToSQLLiteral(v)))
       case (ci, _)                       => ci
     }
   }

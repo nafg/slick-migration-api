@@ -61,16 +61,17 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     import fix._
     import driver.simple._
 
-    object table1 extends Table[Long]("table1") {
+    object table1 extends Table[(Long, Int)]("table1") {
       def id = column[Long]("id", O.NotNull, O.AutoInc)
-      def * = id
+      def col1 = column[Int]("col1", O.Default(10))
+      def * = id ~ col1
     }
 
     val tables = MTable.getTables
 
     val before = tables.list
 
-    val createTable = CreateTable(table1)(_.id)
+    val createTable = CreateTable(table1)(_.id, _.col1)
 
     createTable()
 
@@ -78,11 +79,15 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     inside(after filterNot before.contains) {
       case (table @ MTable(MQName(_, _, table1.tableName), "TABLE", _, _, _, _)) :: Nil =>
-        table.getColumns.list.map {
-          case col => (col.column, col.typeName, col.nullable, col.isAutoInc)
+        import java.sql.Types
+        val cols = table.getColumns.list
+        cols.map {
+          case col => (col.column, col.sqlType, col.nullable, col.isAutoInc)
         } should equal (List(
-          ("id", "BIGINT", Some(false), Some(true))
+          ("id", Types.BIGINT, Some(false), Some(true)),
+          ("col1", Types.INTEGER, Some(false), Some(false))
         ))
+        cols.find(_.column == "col1").flatMap(_.columnDef) should equal (Some("10"))
     }
 
     createTable.reverse should equal (DropTable(table1))
