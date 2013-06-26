@@ -96,7 +96,10 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def withPrimaryKeys(pks: (T => PrimaryKey)*) = new Wrapper(
       new ReversibleMigrationSeq(pks.map(f => CreatePrimaryKey(table)(f)): _*)
     )
-    //TODO withIndexes
+
+    def withIndexes(idxs: (T => Index)*) = new Wrapper(
+      new ReversibleMigrationSeq(idxs.map(f => CreateIndex(f(table))): _*)
+    )
   }
 
   case class CreateTable[T <: TableNode](table: T)(columns: (T => Column[_])*) extends SqlMigration with CreateTableBase[T] {
@@ -149,4 +152,13 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def reverse = CreatePrimaryKey(table)(key)
   }
 
+  case class CreateIndex(index: Index) extends SqlMigration with ReversibleMigration {
+    def sql = dialect.createIndex(index.table, index.name, index.unique, index.on flatMap fieldSym)
+    def reverse = DropIndex(index)
+  }
+
+  case class DropIndex(index: Index) extends SqlMigration with ReversibleMigration {
+    def sql = dialect.dropIndex(index.name)
+    def reverse = CreateIndex(index)
+  }
 }

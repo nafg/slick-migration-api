@@ -39,7 +39,6 @@ trait DbFixture { this: fixture.Suite =>
 }
 
 class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixture {
-
   test("& returns the right type and doesn't keep nesting") { fix =>
     import fix._
     val m = new Migration {
@@ -126,6 +125,8 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     pks(Some("pk")) should equal (List(1 -> "id", 2 -> "stringId"))
 
+    //TODO this doesn't do mech since case classes only compare the first parameter list
+    createPrimaryKey.reverse should equal (DropPrimaryKey(table1)(_.pk))
     createPrimaryKey.reverse()
 
     pks should equal (before)
@@ -184,5 +185,40 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     dropForeignKey()
 
     fks should equal (before)
+  }
+
+  test("CreateIndex, DropIndex") { implicit fix =>
+    import fix._
+    import driver.simple._
+
+    object table1 extends Table[(Long, Int, Int, Int)]("table1") {
+      def id = column[Long]("id")
+      def col1 = column[Int]("col1")
+      def col2 = column[Int]("col2")
+      def col3 = column[Int]("col3")
+      def * = id ~ col1 ~ col2 ~ col3
+      val index1 = index("index1", col1)
+      val index2 = index("index2", col2 ~ col3, true)
+    }
+
+    def indexList = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getIndexInfo().list)
+    def indexes = indexList
+      .groupBy(i => (i.indexName, !i.nonUnique))
+      .mapValues {
+        _ collect { case MIndexInfo(MQName(_, _, "table1"), _, _, _, _, seq, col, _, _, _, _) =>
+            (seq, col) }
+      }
+
+    CreateTable(table1)(_.id, _.col1, _.col2, _.col3)()
+
+    val createIndexes = CreateIndex(table1.index1) & CreateIndex(table1.index2)
+    createIndexes()
+
+    indexes(Some("index1") -> false) should equal (List((1, Some("col1"))))
+    indexes(Some("index2") -> true) should equal (List((1, Some("col2")), (2, Some("col3"))))
+
+    createIndexes.reverse should equal (DropIndex(table1.index2) & DropIndex(table1.index1))
+
+    createIndexes.reverse()
   }
 }

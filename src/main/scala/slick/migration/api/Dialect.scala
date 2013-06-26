@@ -68,4 +68,12 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   def dropPrimaryKey(table: TableNode, name: String) =
     dropConstraint(table, name)
+
+  def createIndex(table: TableNode, name: String, unique: Boolean, columns: Seq[FieldSymbol]) =
+    s"""create ${ if(unique) "unique" else "" }
+      | index ${ quoteIdentifier(name) } on ${ quoteTableName(table) }
+      | ${ columnList(columns) }""".stripMargin
+
+  def dropIndex(name: String) =
+    s"drop index ${ quoteIdentifier(name) }"
 }
