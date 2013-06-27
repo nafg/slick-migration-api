@@ -16,7 +16,7 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   def quoteIdentifier(id: String): String = {
     val s = new StringBuilder(id.length + 4) append '"'
-    for(c <- id) if(c == '"') s append "\"\"" else s append c
+    for (c <- id) if (c == '"') s append "\"\"" else s append c
     (s append '"').toString
   }
 
@@ -29,10 +29,10 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   def columnSql(ci: ColumnInfo, includePk: Boolean = true): String = {
     def name = quoteIdentifier(ci.name)
-    def typ = if(ci.autoInc) "SERIAL" else ci.sqlType
+    def typ = if (ci.autoInc) "SERIAL" else ci.sqlType
     def default = ci.default.map(" DEFAULT " + _).getOrElse("")
-    def notNull = if(ci.notNull) " NOT NULL" else ""
-    def pk = if(includePk && ci.isPk) " PRIMARY KEY" else ""
+    def notNull = if (ci.notNull) " NOT NULL" else ""
+    def pk = if (includePk && ci.isPk) " PRIMARY KEY" else ""
     s"$name $typ$default$notNull$pk"
   }
 
@@ -40,42 +40,42 @@ class Dialect[D <: JdbcDriver](driver: D) {
     quotedColumnNames(columns).mkString("(", ", ", ")")
 
   def createTable(table: TableNode, columns: Seq[ColumnInfo]): String =
-    s"""create table ${ quoteTableName(table) } (
-      | ${ columns map { columnSql(_, true) } mkString ", " }
+    s"""create table ${quoteTableName(table)} (
+      | ${columns map { columnSql(_, true) } mkString ", "}
       |)""".stripMargin
 
   def dropTable(table: TableNode): String =
-    s"drop table ${ quoteTableName(table) }"
+    s"drop table ${quoteTableName(table)}"
 
   def createForeignKey(sourceTable: TableNode, name: String, sourceColumns: Seq[FieldSymbol], targetTable: TableNode, targetColumns: Seq[FieldSymbol], onUpdate: ForeignKeyAction, onDelete: ForeignKeyAction): String =
-    s"""alter table ${ quoteTableName(sourceTable) }
-      | add constraint ${ quoteIdentifier(name) }
-      | foreign key ${ columnList(sourceColumns) }
-      | references ${ quoteTableName(targetTable) }
-      | (${ quotedColumnNames(targetColumns) mkString ", " })
-      | on update ${ onUpdate.action } on delete ${ onDelete.action }""".stripMargin
+    s"""alter table ${quoteTableName(sourceTable)}
+      | add constraint ${quoteIdentifier(name)}
+      | foreign key ${columnList(sourceColumns)}
+      | references ${quoteTableName(targetTable)}
+      | (${quotedColumnNames(targetColumns) mkString ", "})
+      | on update ${onUpdate.action} on delete ${onDelete.action}""".stripMargin
 
   def dropConstraint(table: TableNode, name: String) =
-    s"alter table ${ quoteTableName(table) } drop constraint ${ quoteIdentifier(name) }"
+    s"alter table ${quoteTableName(table)} drop constraint ${quoteIdentifier(name)}"
 
   def dropForeignKey(sourceTable: TableNode, name: String) =
     dropConstraint(sourceTable, name)
 
   def createPrimaryKey(table: TableNode, name: String, columns: Seq[FieldSymbol]) =
-    s"""alter table ${ quoteTableName(table) }
-      | add constraint ${ quoteIdentifier(name) } primary key
-      | ${ columnList(columns) }""".stripMargin
+    s"""alter table ${quoteTableName(table)}
+      | add constraint ${quoteIdentifier(name)} primary key
+      | ${columnList(columns)}""".stripMargin
 
   def dropPrimaryKey(table: TableNode, name: String) =
     dropConstraint(table, name)
 
   def createIndex(table: TableNode, name: String, unique: Boolean, columns: Seq[FieldSymbol]) =
-    s"""create ${ if(unique) "unique" else "" }
-      | index ${ quoteIdentifier(name) } on ${ quoteTableName(table) }
-      | ${ columnList(columns) }""".stripMargin
+    s"""create ${if (unique) "unique" else ""}
+      | index ${quoteIdentifier(name)} on ${quoteTableName(table)}
+      | ${columnList(columns)}""".stripMargin
 
   def dropIndex(name: String) =
-    s"drop index ${ quoteIdentifier(name) }"
+    s"drop index ${quoteIdentifier(name)}"
 
   def alterColumnType(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}

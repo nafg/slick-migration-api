@@ -54,9 +54,9 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
   object CanConcatMigrations extends CanConcatMigrationsLow {
     implicit def reversible[A <: ReversibleMigration, B <: ReversibleMigration]: CanConcatMigrations[A, B, ReversibleMigrationSeq] = new CanConcatMigrations({
-        case (rms: ReversibleMigrationSeq, b) => new ReversibleMigrationSeq(rms.migrations :+ b: _*)
-        case (a, b)                           => new ReversibleMigrationSeq(a, b)
-      })
+      case (rms: ReversibleMigrationSeq, b) => new ReversibleMigrationSeq(rms.migrations :+ b: _*)
+      case (a, b)                           => new ReversibleMigrationSeq(a, b)
+    })
   }
 
   case class MigrationSeq(migrations: Migration*) extends Migration {
@@ -116,7 +116,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
 
   object CreateForeignKey {
     def apply(fkq: ForeignKeyQuery[_ <: TableNode, _]): ReversibleMigrationSeq =
-     new ReversibleMigrationSeq(fkq.fks.map(new CreateForeignKey(_)): _*)
+      new ReversibleMigrationSeq(fkq.fks.map(new CreateForeignKey(_)): _*)
   }
   case class CreateForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
     def sql = fk.sourceTable match {
@@ -129,7 +129,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
 
   object DropForeignKey {
     def apply(fkq: ForeignKeyQuery[_ <: TableNode, _]): ReversibleMigrationSeq =
-     new ReversibleMigrationSeq(fkq.fks.map(new DropForeignKey(_)): _*)
+      new ReversibleMigrationSeq(fkq.fks.map(new DropForeignKey(_)): _*)
   }
   case class DropForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
     def sql = fk.sourceTable match {

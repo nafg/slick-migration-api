@@ -29,7 +29,7 @@ trait DbFixture { this: fixture.Suite =>
 
   val dbs = List(H2Mem)
 
-  def withFixture(test: OneArgTest) = for(tdb <- dbs) tdb.driver match {
+  def withFixture(test: OneArgTest) = for (tdb <- dbs) tdb.driver match {
     case driver: JdbcDriver =>
       tdb.cleanUpBefore()
       val db = tdb.createDB()
@@ -205,8 +205,10 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     def indexes = indexList
       .groupBy(i => (i.indexName, !i.nonUnique))
       .mapValues {
-        _ collect { case MIndexInfo(MQName(_, _, "table1"), _, _, _, _, seq, col, _, _, _, _) =>
-            (seq, col) }
+        _ collect {
+          case MIndexInfo(MQName(_, _, "table1"), _, _, _, _, seq, col, _, _, _, _) =>
+            (seq, col)
+        }
       }
 
     CreateTable(table1)(_.id, _.col1, _.col2, _.col3)()
