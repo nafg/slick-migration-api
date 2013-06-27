@@ -161,4 +161,14 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def sql = dialect.dropIndex(index.name)
     def reverse = CreateIndex(index)
   }
+
+  case class AlterColumnType[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
+    def sql = {
+      val col = column(table)
+      fieldSym(Node(col)) match {
+        case Some(c) => dialect.alterColumnType(table, columnInfo(c))
+        case None      => sys.error("Invalid column: " + col)
+      }
+    }
+  }
 }

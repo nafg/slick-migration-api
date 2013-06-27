@@ -5,13 +5,14 @@ import org.scalatest.fixture
 import org.scalatest.Inside
 import org.scalatest.matchers.ShouldMatchers
 
-
 import com.typesafe.slick.testkit.util._
 
 import scala.slick.driver._
 import scala.slick.lifted.ForeignKeyAction
 
-import jdbc.meta._
+import scala.slick.jdbc.meta._
+
+import java.sql.Types
 
 object H2Mem extends JdbcTestDB("h2mem") {
   type Driver = H2Driver.type
@@ -78,7 +79,6 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     inside(after filterNot before.contains) {
       case (table @ MTable(MQName(_, _, table1.tableName), "TABLE", _, _, _, _)) :: Nil =>
-        import java.sql.Types
         val cols = table.getColumns.list
         cols.map {
           case col => (col.column, col.sqlType, col.nullable, col.isAutoInc)
@@ -125,7 +125,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     pks(Some("pk")) should equal (List(1 -> "id", 2 -> "stringId"))
 
-    //TODO this doesn't do mech since case classes only compare the first parameter list
+    //TODO this doesn't do much since case classes only compare the first parameter list
     createPrimaryKey.reverse should equal (DropPrimaryKey(table1)(_.pk))
     createPrimaryKey.reverse()
 
@@ -220,5 +220,27 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     createIndexes.reverse should equal (DropIndex(table1.index2) & DropIndex(table1.index1))
 
     createIndexes.reverse()
+  }
+
+  test("AlterColumnType") { implicit fix =>
+    import fix._
+    import driver.simple._
+
+    object table1 extends Table[Long]("table1") {
+      def id = column[Long]("id")
+      def * = id
+    }
+
+    CreateTable(table1)(_.column[String]("id"))()
+
+    def columns = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getColumns.list).map {
+      case col => (col.column, col.sqlType)
+    }
+
+    columns.toList should equal (List(("id", Types.VARCHAR)))
+
+    AlterColumnType(table1)(_.id)()
+
+    columns.toList should equal (List(("id", Types.BIGINT)))
   }
 }

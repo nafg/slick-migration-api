@@ -22,7 +22,7 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   def quoteTableName(t: TableNode): String = t.schemaName match {
     case Some(s) => quoteIdentifier(s) + "." + quoteIdentifier(t.tableName)
-    case None => quoteIdentifier(t.tableName)
+    case None    => quoteIdentifier(t.tableName)
   }
 
   protected def quotedColumnNames(ns: Seq[FieldSymbol]) = ns.map(fs => quoteIdentifier(fs.name))
@@ -76,4 +76,9 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   def dropIndex(name: String) =
     s"drop index ${ quoteIdentifier(name) }"
+
+  def alterColumnType(table: TableNode, column: ColumnInfo) =
+    s"""alter table ${quoteTableName(table)}
+      | alter column ${quoteIdentifier(column.name)}
+      | type ${column.sqlType}""".stripMargin
 }
