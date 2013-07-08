@@ -221,6 +221,35 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     createIndexes.reverse()
   }
 
+  test("AddColumn, DropColumn") { implicit fix =>
+    import fix._
+    import driver.simple._
+
+    object table1 extends Table[(Long, String)]("table1") {
+      def col1 = column[Long]("col1")
+      def col2 = column[String]("col2")
+      def * = col1 ~ col2
+    }
+
+    CreateTable(table1)(_.col1)()
+
+    def columnsCount = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getColumns.list).length
+
+    columnsCount should equal (1)
+
+    val addColumn = AddColumn(table1)(_.col2)
+    addColumn()
+
+    columnsCount should equal (2)
+
+    val dropColumn = addColumn.reverse
+    dropColumn should equal (DropColumn(table1)(_.col2))
+
+    dropColumn()
+
+    columnsCount should equal (1)
+  }
+
   test("AlterColumnType/Default/Nullability") { implicit fix =>
     import fix._
     import driver.simple._

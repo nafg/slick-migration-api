@@ -77,6 +77,14 @@ class Dialect[D <: JdbcDriver](driver: D) {
   def dropIndex(name: String) =
     s"drop index ${quoteIdentifier(name)}"
 
+  def addColumn(table: TableNode, column: ColumnInfo) =
+    s"""alter table ${quoteTableName(table)}
+      | add column ${columnSql(column, false)}""".stripMargin
+
+  def dropColumn(table: TableNode, column: FieldSymbol) =
+    s"""alter table ${quoteTableName(table)}
+      | drop column ${quoteIdentifier(column.name)}""".stripMargin
+
   def alterColumnType(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
       | alter column ${quoteIdentifier(column.name)}

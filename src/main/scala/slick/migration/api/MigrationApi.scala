@@ -167,6 +167,21 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def reverse = CreateIndex(index)
   }
 
+  case class AddColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {
+    def sql = dialect.addColumn(table, columnInfo(column(table)))
+    def reverse = DropColumn(table)(column)
+  }
+  case class DropColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {
+    def sql = {
+      val col = column(table)
+      fieldSym(Node(col)) match {
+        case Some(c) => dialect.dropColumn(table, c)
+        case None    => sys.error("Invalid column: " + col)
+      }
+    }
+    def reverse = AddColumn(table)(column)
+  }
+
   case class AlterColumnType[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
     def sql = dialect.alterColumnType(table, columnInfo(column(table)))
   }
