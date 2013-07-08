@@ -221,7 +221,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     createIndexes.reverse()
   }
 
-  test("AlterColumnType") { implicit fix =>
+  test("AlterColumnType/Default/Nullability") { implicit fix =>
     import fix._
     import driver.simple._
 
