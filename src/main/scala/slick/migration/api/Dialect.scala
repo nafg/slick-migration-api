@@ -81,4 +81,14 @@ class Dialect[D <: JdbcDriver](driver: D) {
     s"""alter table ${quoteTableName(table)}
       | alter column ${quoteIdentifier(column.name)}
       | type ${column.sqlType}""".stripMargin
+
+  def alterColumnDefault(table: TableNode, column: ColumnInfo) =
+    s"""alter table ${quoteTableName(table)}
+      | alter column ${quoteIdentifier(column.name)}
+      | set default ${column.default getOrElse "null"}""".stripMargin
+
+  def alterColumnNullability(table: TableNode, column: ColumnInfo) =
+    s"""alter table ${quoteTableName(table)}
+      | alter column ${quoteIdentifier(column.name)}
+      | ${if (column.notNull) "set" else "drop"} not null""".stripMargin
 }

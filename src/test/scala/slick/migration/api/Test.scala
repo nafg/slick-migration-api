@@ -4,15 +4,12 @@ package migration.api
 import org.scalatest.fixture
 import org.scalatest.Inside
 import org.scalatest.matchers.ShouldMatchers
-
 import com.typesafe.slick.testkit.util._
-
 import scala.slick.driver._
 import scala.slick.lifted.ForeignKeyAction
-
 import scala.slick.jdbc.meta._
-
 import java.sql.Types
+import java.sql.SQLException
 
 object H2Mem extends JdbcTestDB("h2mem") {
   type Driver = H2Driver.type
@@ -229,20 +226,33 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     import driver.simple._
 
     object table1 extends Table[Long]("table1") {
-      def id = column[Long]("id")
+      def id = column[Long]("id", O.Default(20), O.NotNull)
       def * = id
     }
 
-    CreateTable(table1)(_.column[String]("id"))()
+    CreateTable(table1)(_.column[String]("id", table1.O.Nullable))()
 
     def columns = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getColumns.list).map {
-      case col => (col.column, col.sqlType)
+      case col => (col.column, col.sqlType, col.columnDef)
     }
 
-    columns.toList should equal (List(("id", Types.VARCHAR)))
+    columns.toList should equal (List(("id", Types.VARCHAR, None)))
 
-    AlterColumnType(table1)(_.id)()
+    try table1.insert(null)
+    catch {
+      case e: SQLException =>
+        fail("Could not insert NULL")
+    }
+    Query(table1).delete
 
-    columns.toList should equal (List(("id", Types.BIGINT)))
+    val m = AlterColumnType(table1)(_.id) &
+      AlterColumnDefault(table1)(_.id) &
+      AlterColumnNullability(table1)(_.id)
+    m()
+
+    columns.toList should equal (List(("id", Types.BIGINT, Some("20"))))
+    intercept[SQLException] {
+      table1.insert(null)
+    }
   }
 }

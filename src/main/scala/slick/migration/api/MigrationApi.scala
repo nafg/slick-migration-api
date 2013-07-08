@@ -24,6 +24,11 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
       case (ci, _)                       => ci
     }
   }
+  protected def columnInfo(column: Column[_]): ColumnInfo =
+    fieldSym(Node(column)) match {
+      case Some(c) => columnInfo(c)
+      case None    => sys.error("Invalid column: " + column)
+    }
 
   protected def fieldSym(node: Node): Option[FieldSymbol] = node match {
     case Select(_, f: FieldSymbol) => Some(f)
@@ -163,12 +168,12 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class AlterColumnType[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
-    def sql = {
-      val col = column(table)
-      fieldSym(Node(col)) match {
-        case Some(c) => dialect.alterColumnType(table, columnInfo(c))
-        case None      => sys.error("Invalid column: " + col)
-      }
-    }
+    def sql = dialect.alterColumnType(table, columnInfo(column(table)))
+  }
+  case class AlterColumnDefault[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
+    def sql = dialect.alterColumnDefault(table, columnInfo(column(table)))
+  }
+  case class AlterColumnNullability[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
+    def sql = dialect.alterColumnNullability(table, columnInfo(column(table)))
   }
 }
