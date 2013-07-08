@@ -47,6 +47,10 @@ class Dialect[D <: JdbcDriver](driver: D) {
   def dropTable(table: TableNode): String =
     s"drop table ${quoteTableName(table)}"
 
+  def renameTable(table: TableNode, to: String) =
+    s"""alter table ${quoteTableName(table)}
+      | rename to ${quoteIdentifier(to)}""".stripMargin
+
   def createForeignKey(sourceTable: TableNode, name: String, sourceColumns: Seq[FieldSymbol], targetTable: TableNode, targetColumns: Seq[FieldSymbol], onUpdate: ForeignKeyAction, onDelete: ForeignKeyAction): String =
     s"""alter table ${quoteTableName(sourceTable)}
       | add constraint ${quoteIdentifier(name)}
@@ -77,6 +81,9 @@ class Dialect[D <: JdbcDriver](driver: D) {
   def dropIndex(name: String) =
     s"drop index ${quoteIdentifier(name)}"
 
+  def renameIndex(oldName: String, newName: String) =
+    s"alter index ${quoteIdentifier(oldName)} rename to ${quoteIdentifier(newName)}".stripMargin
+
   def addColumn(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
       | add column ${columnSql(column, false)}""".stripMargin
@@ -84,6 +91,11 @@ class Dialect[D <: JdbcDriver](driver: D) {
   def dropColumn(table: TableNode, column: FieldSymbol) =
     s"""alter table ${quoteTableName(table)}
       | drop column ${quoteIdentifier(column.name)}""".stripMargin
+
+  def renameColumn(table: TableNode, column: FieldSymbol, to: FieldSymbol) =
+    s"""alter table ${quoteTableName(table)}
+      | rename column ${quoteIdentifier(column.name)}
+      | to ${quoteIdentifier(to.name)}""".stripMargin
 
   def alterColumnType(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}

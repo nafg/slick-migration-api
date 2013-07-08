@@ -35,6 +35,9 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     case _                         => None
   }
 
+  protected def fieldSym(column: Column[_]): FieldSymbol =
+    fieldSym(Node(column)) getOrElse sys.error("Invalid column: " + column)
+
   trait Migration {
     def apply()(implicit session: driver.simple.Session): Unit
   }
@@ -119,6 +122,10 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def sql = dialect.dropTable(table)
   }
 
+  case class RenameTable(table: TableNode, to: String) extends SqlMigration {
+    def sql = dialect.renameTable(table, to)
+  }
+
   object CreateForeignKey {
     def apply(fkq: ForeignKeyQuery[_ <: TableNode, _]): ReversibleMigrationSeq =
       new ReversibleMigrationSeq(fkq.fks.map(new CreateForeignKey(_)): _*)
@@ -126,7 +133,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   case class CreateForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
     def sql = fk.sourceTable match {
       case sourceTable: TableNode =>
-        dialect.createForeignKey(sourceTable, fk.name, fk.linearizedSourceColumns.flatMap(fieldSym), fk.targetTable, fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym), fk.onUpdate, fk.onDelete)
+        dialect.createForeignKey(sourceTable, fk.name, fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq), fk.targetTable, fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym(_).toSeq), fk.onUpdate, fk.onDelete)
     }
 
     def reverse = DropForeignKey(fk)
@@ -147,7 +154,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   case class CreatePrimaryKey[T <: TableNode](table: T)(key: T => PrimaryKey) extends SqlMigration with ReversibleMigration {
     def sql = {
       val pk = key(table)
-      dialect.createPrimaryKey(table, pk.name, pk.columns flatMap fieldSym)
+      dialect.createPrimaryKey(table, pk.name, pk.columns flatMap (fieldSym(_)))
     }
     def reverse = DropPrimaryKey(table)(key)
   }
@@ -158,7 +165,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class CreateIndex(index: Index) extends SqlMigration with ReversibleMigration {
-    def sql = dialect.createIndex(index.table, index.name, index.unique, index.on flatMap fieldSym)
+    def sql = dialect.createIndex(index.table, index.name, index.unique, index.on flatMap (fieldSym(_)))
     def reverse = DropIndex(index)
   }
 
@@ -172,14 +179,12 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def reverse = DropColumn(table)(column)
   }
   case class DropColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {
-    def sql = {
-      val col = column(table)
-      fieldSym(Node(col)) match {
-        case Some(c) => dialect.dropColumn(table, c)
-        case None    => sys.error("Invalid column: " + col)
-      }
-    }
+    def sql = dialect.dropColumn(table, fieldSym(column(table)))
     def reverse = AddColumn(table)(column)
+  }
+
+  case class RenameColumn[T <: TableNode](table: T)(oldColumn: T => Column[_], newColumn: T => Column[_]) extends SqlMigration {
+    def sql = dialect.renameColumn(table, fieldSym(oldColumn(table)), fieldSym(newColumn(table)))
   }
 
   case class AlterColumnType[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {

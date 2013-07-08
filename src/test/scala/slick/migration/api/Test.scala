@@ -284,4 +284,6 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
       table1.insert(null)
     }
   }
+
+  test("Renames")(pending)
 }
