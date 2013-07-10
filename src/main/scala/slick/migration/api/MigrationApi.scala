@@ -174,6 +174,10 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
     def reverse = CreateIndex(index)
   }
 
+  case class RenameIndex(index: Index, to: String) extends SqlMigration {
+    def sql = dialect.renameIndex(index.name, to)
+  }
+
   case class AddColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {
     def sql = dialect.addColumn(table, columnInfo(column(table)))
     def reverse = DropColumn(table)(column)
