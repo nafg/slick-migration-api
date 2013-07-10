@@ -288,5 +288,34 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     }
   }
 
-  test("RenameTable/Column/Index")(pending)
+  test("RenameTable/Column/Index") { implicit fix =>
+    import fix._
+    import driver.simple._
+
+    trait tables { this: Table[Long] =>
+      def col1 = column[Long]("oldname")
+      def * = col1
+      val index1 = index("oldname", col1)
+    }
+    object oldname extends Table[Long]("oldname") with tables
+    object table1 extends Table[Long]("table1") with tables
+
+    CreateTable(oldname)(_.col1).withIndexes(_.index1)()
+
+    def tables = getTables.map(_.name.name)
+    def columns = getTables.flatMap(_.getColumns.list.map(_.column))
+    def indexes = getTables.flatMap(_.getIndexInfo().list.flatMap(_.indexName))
+
+    tables should equal (List("oldname"))
+    columns should equal (List("oldname"))
+    indexes should equal (List("oldname"))
+
+    RenameTable(oldname, "table1")()
+    RenameColumn(table1)(_.col1, _.column[Long]("col1"))()
+    RenameIndex(table1.index1, "index1")()
+
+    tables should equal (List("table1"))
+    columns should equal (List("col1"))
+    indexes should equal (List("index1"))
+  }
 }

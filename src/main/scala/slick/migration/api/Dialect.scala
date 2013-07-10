@@ -94,8 +94,8 @@ class Dialect[D <: JdbcDriver](driver: D) {
 
   def renameColumn(table: TableNode, column: FieldSymbol, to: FieldSymbol) =
     s"""alter table ${quoteTableName(table)}
-      | rename column ${quoteIdentifier(column.name)}
-      | to ${quoteIdentifier(to.name)}""".stripMargin
+      | alter column ${quoteIdentifier(column.name)}
+      | rename to ${quoteIdentifier(to.name)}""".stripMargin
 
   def alterColumnType(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
