@@ -8,6 +8,7 @@ import com.typesafe.slick.testkit.util._
 import scala.slick.driver._
 import scala.slick.lifted.ForeignKeyAction
 import scala.slick.jdbc.meta._
+import scala.slick.jdbc.JdbcBackend
 import java.sql.Types
 import java.sql.SQLException
 
@@ -25,6 +26,10 @@ trait DbFixture { this: fixture.Suite =>
   implicit def sessForFP(implicit fp: FixtureParam): JdbcDriver.simple.Session = fp.session
 
   val dbs = List(H2Mem)
+
+  def getTables(implicit session: JdbcBackend#Session) = MTable.getTables.list
+  def getTable(name: String)(implicit session: JdbcBackend#Session) =
+    getTables.find(_.name.name == name)
 
   def withFixture(test: OneArgTest) = for (tdb <- dbs) tdb.driver match {
     case driver: JdbcDriver =>
@@ -64,15 +69,13 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
       def * = id ~ col1
     }
 
-    val tables = MTable.getTables
-
-    val before = tables.list
+    val before = getTables
 
     val createTable = CreateTable(table1)(_.id, _.col1)
 
     createTable()
 
-    val after = tables.list
+    val after = getTables
 
     inside(after filterNot before.contains) {
       case (table @ MTable(MQName(_, _, table1.tableName), "TABLE", _, _, _, _)) :: Nil =>
@@ -90,7 +93,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     createTable.reverse()
 
-    tables.list should equal (before)
+    getTables should equal (before)
   }
 
   test("CreatePrimaryKey, DropPrimaryKey") { implicit fix =>
@@ -104,7 +107,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
       def pk = primaryKey("pk", id ~ stringId)
     }
 
-    def pkList = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getPrimaryKeys.list)
+    def pkList = getTable("table1").map(_.getPrimaryKeys.list) getOrElse Nil
     def pks = pkList
       .groupBy(_.pkName)
       .mapValues {
@@ -138,7 +141,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
       def other = column[Long]("other")
 
       def * = id ~ other
-      // lazy val so equality works
+      // not a def, so equality works
       lazy val fk = foreignKey("fk_other", other, table2)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
     }
     object table2 extends Table[Long]("table2") {
@@ -149,7 +152,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     CreateTable(table1)(_.id, _.other)()
     CreateTable(table2)(_.id)()
 
-    def fks = MTable.getTables.to[Set] map { t =>
+    def fks = getTables.to[Set] map { t =>
       (
         t.name.name,
         t.getImportedKeys.list map { fk =>
@@ -198,7 +201,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
       val index2 = index("index2", col2 ~ col3, true)
     }
 
-    def indexList = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getIndexInfo().list)
+    def indexList = getTable("table1").map(_.getIndexInfo().list) getOrElse Nil
     def indexes = indexList
       .groupBy(i => (i.indexName, !i.nonUnique))
       .mapValues {
@@ -233,21 +236,21 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     CreateTable(table1)(_.col1)()
 
-    def columnsCount = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getColumns.list).length
+    def columnsCount = getTable("table1").map(_.getColumns.list.length)
 
-    columnsCount should equal (1)
+    columnsCount should equal (Some(1))
 
     val addColumn = AddColumn(table1)(_.col2)
     addColumn()
 
-    columnsCount should equal (2)
+    columnsCount should equal (Some(2))
 
     val dropColumn = addColumn.reverse
     dropColumn should equal (DropColumn(table1)(_.col2))
 
     dropColumn()
 
-    columnsCount should equal (1)
+    columnsCount should equal (Some(1))
   }
 
   test("AlterColumnType/Default/Nullability") { implicit fix =>
@@ -261,9 +264,9 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
 
     CreateTable(table1)(_.column[String]("id", table1.O.Nullable))()
 
-    def columns = MTable.getTables.list.filter(_.name.name == "table1").flatMap(_.getColumns.list).map {
+    def columns = getTable("table1").map(_.getColumns.list.map {
       case col => (col.column, col.sqlType, col.columnDef)
-    }
+    }) getOrElse Nil
 
     columns.toList should equal (List(("id", Types.VARCHAR, None)))
 
@@ -285,5 +288,5 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     }
   }
 
-  test("Renames")(pending)
+  test("RenameTable/Column/Index")(pending)
 }
