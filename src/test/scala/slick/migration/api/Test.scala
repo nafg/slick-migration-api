@@ -11,6 +11,8 @@ import scala.slick.jdbc.meta._
 import scala.slick.jdbc.JdbcBackend
 import java.sql.Types
 import java.sql.SQLException
+import org.scalatest.FunSuite
+import org.scalatest.BeforeAndAfterAll
 
 object H2Mem extends JdbcTestDB("h2mem") {
   type Driver = H2Driver.type
@@ -21,29 +23,10 @@ object H2Mem extends JdbcTestDB("h2mem") {
   override lazy val capabilities = driver.capabilities + TestDB.plainSql + TestDB.plainSqlWide
 }
 
-trait DbFixture { this: fixture.Suite =>
-  class FixtureParam(driver: JdbcDriver, val session: JdbcDriver.simple.Session) extends Migrations(driver)
-  implicit def sessForFP(implicit fp: FixtureParam): JdbcDriver.simple.Session = fp.session
-
-  val dbs = List(H2Mem)
-
-  def getTables(implicit session: JdbcBackend#Session) = MTable.getTables.list
-  def getTable(name: String)(implicit session: JdbcBackend#Session) =
-    getTables.find(_.name.name == name)
-
-  def withFixture(test: OneArgTest) = for (tdb <- dbs) tdb.driver match {
-    case driver: JdbcDriver =>
-      tdb.cleanUpBefore()
-      val db = tdb.createDB()
-      try db.withSession { session: driver.simple.Session =>
-        test(new FixtureParam(driver, session))
-      } finally tdb.cleanUpAfter()
-  }
-}
-
-class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixture {
-  test("& returns the right type and doesn't keep nesting") { fix =>
-    import fix._
+class MigrationSeqTest extends FunSuite with ShouldMatchers {
+  test("& returns the right type and doesn't keep nesting") {
+    object migrations extends Migrations(H2Driver)
+    import migrations._
     val m = new Migration {
       def apply()(implicit s: driver.simple.Session) = ???
     }
@@ -55,14 +38,39 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     }
 
     val rms = rm & rm & rm
-    val rms1: ReversibleMigrationSeq = rms // verify the type
+    implicitly[rms.type <:< ReversibleMigrationSeq]
     rms should equal (new ReversibleMigrationSeq(rm, rm, rm))
   }
+}
 
-  test("CreateTable, DropTable") { implicit fix =>
-    import fix._
-    import driver.simple._
+class H2Test extends DbTest {
+  def tdb = H2Mem
+}
 
+trait DbTest extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
+  def tdb: JdbcTestDB
+
+  implicit lazy val session = tdb.createDB.createSession
+
+  lazy val driver = tdb.driver
+
+  object migrations extends Migrations(driver)
+
+  import migrations._
+  import driver.simple._
+
+  override def beforeAll() = tdb.cleanUpBefore()
+  override def afterAll() = {
+    tdb.cleanUpAfter()
+    session.close()
+  }
+
+  def getTables(implicit session: JdbcBackend#Session) = MTable.getTables.list
+  def getTable(name: String)(implicit session: JdbcBackend#Session) =
+    getTables.find(_.name.name == name)
+
+
+  test("CreateTable, DropTable") {
     object table1 extends Table[(Long, Int)]("table1") {
       def id = column[Long]("id", O.NotNull, O.AutoInc)
       def col1 = column[Int]("col1", O.Default(10))
@@ -96,10 +104,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     getTables should equal (before)
   }
 
-  test("CreatePrimaryKey, DropPrimaryKey") { implicit fix =>
-    import fix._
-    import driver.simple._
-
+  test("CreatePrimaryKey, DropPrimaryKey") {
     object table1 extends Table[(Long, String)]("table1") {
       def id = column[Long]("id")
       def stringId = column[String]("stringId")
@@ -130,12 +135,11 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     createPrimaryKey.reverse()
 
     pks should equal (before)
+
+    DropTable(table1)()
   }
 
-  test("CreateForeignKey, DropForeignKey") { implicit fix =>
-    import fix._
-    import driver.simple._
-
+  test("CreateForeignKey, DropForeignKey") {
     object table1 extends Table[(Long, Long)]("table1") {
       def id = column[Long]("id", O.PrimaryKey)
       def other = column[Long]("other")
@@ -185,12 +189,12 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     dropForeignKey()
 
     fks should equal (before)
+
+    DropTable(table1)()
+    DropTable(table2)()
   }
 
-  test("CreateIndex, DropIndex") { implicit fix =>
-    import fix._
-    import driver.simple._
-
+  test("CreateIndex, DropIndex") {
     object table1 extends Table[(Long, Int, Int, Int)]("table1") {
       def id = column[Long]("id")
       def col1 = column[Int]("col1")
@@ -222,12 +226,11 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     createIndexes.reverse should equal (DropIndex(table1.index2) & DropIndex(table1.index1))
 
     createIndexes.reverse()
+
+    DropTable(table1)()
   }
 
-  test("AddColumn, DropColumn") { implicit fix =>
-    import fix._
-    import driver.simple._
-
+  test("AddColumn, DropColumn") {
     object table1 extends Table[(Long, String)]("table1") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2")
@@ -251,12 +254,11 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     dropColumn()
 
     columnsCount should equal (Some(1))
+
+    DropTable(table1)()
   }
 
-  test("AlterColumnType/Default/Nullability") { implicit fix =>
-    import fix._
-    import driver.simple._
-
+  test("AlterColumnType/Default/Nullability") {
     object table1 extends Table[Long]("table1") {
       def id = column[Long]("id", O.Default(20), O.NotNull)
       def * = id
@@ -286,12 +288,11 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     intercept[SQLException] {
       table1.insert(null)
     }
+
+    DropTable(table1)()
   }
 
-  test("RenameTable/Column/Index") { implicit fix =>
-    import fix._
-    import driver.simple._
-
+  test("RenameTable/Column/Index") {
     trait tables { this: Table[Long] =>
       def col1 = column[Long]("oldname")
       def * = col1
@@ -317,5 +318,7 @@ class Test extends fixture.FunSuite with ShouldMatchers with Inside with DbFixtu
     tables should equal (List("table1"))
     columns should equal (List("col1"))
     indexes should equal (List("index1"))
+
+    DropTable(table1)()
   }
 }
