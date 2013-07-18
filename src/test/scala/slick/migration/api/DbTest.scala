@@ -1,51 +1,16 @@
 package scala.slick
 package migration.api
 
-import org.scalatest.fixture
-import org.scalatest.Inside
-import org.scalatest.matchers.ShouldMatchers
-import com.typesafe.slick.testkit.util._
-import scala.slick.driver._
-import scala.slick.lifted.ForeignKeyAction
-import scala.slick.jdbc.meta._
+import java.sql.{SQLException, Types}
+
 import scala.slick.jdbc.JdbcBackend
-import java.sql.Types
-import java.sql.SQLException
-import org.scalatest.FunSuite
-import org.scalatest.BeforeAndAfterAll
+import scala.slick.jdbc.meta.{MIndexInfo, MPrimaryKey, MQName, MTable}
+import scala.slick.lifted.ForeignKeyAction
 
-object H2Mem extends JdbcTestDB("h2mem") {
-  type Driver = H2Driver.type
-  val driver = H2Driver
-  val url = "jdbc:h2:mem:test1"
-  val jdbcDriver = "org.h2.Driver"
-  override def isPersistent = false
-  override lazy val capabilities = driver.capabilities + TestDB.plainSql + TestDB.plainSqlWide
-}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Inside}
+import org.scalatest.matchers.ShouldMatchers
 
-class MigrationSeqTest extends FunSuite with ShouldMatchers {
-  test("& returns the right type and doesn't keep nesting") {
-    object migrations extends Migrations(H2Driver)
-    import migrations._
-    val m = new Migration {
-      def apply()(implicit s: driver.simple.Session) = ???
-    }
-    m & m & m should equal (MigrationSeq(m, m, m))
-
-    val rm = new ReversibleMigration {
-      def apply()(implicit s: driver.simple.Session) = ???
-      def reverse = ???
-    }
-
-    val rms = rm & rm & rm
-    implicitly[rms.type <:< ReversibleMigrationSeq]
-    rms should equal (new ReversibleMigrationSeq(rm, rm, rm))
-  }
-}
-
-class H2Test extends DbTest {
-  def tdb = H2Mem
-}
+import com.typesafe.slick.testkit.util.JdbcTestDB
 
 trait DbTest extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
   def tdb: JdbcTestDB
