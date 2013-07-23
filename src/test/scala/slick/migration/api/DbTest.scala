@@ -12,9 +12,7 @@ import org.scalatest.matchers.ShouldMatchers
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
 
-trait DbTest extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
-  def tdb: JdbcTestDB
-
+abstract class DbTest[TDB <: JdbcTestDB](val tdb: TDB) extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
   implicit lazy val session = tdb.createDB.createSession
 
   lazy val driver = tdb.driver
