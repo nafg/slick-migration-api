@@ -82,25 +82,26 @@ class Dialect[D <: JdbcDriver](driver: D) {
     s"drop index ${quoteIdentifier(name)}"
 
   def renameIndex(oldName: String, newName: String) =
-    s"alter index ${quoteIdentifier(oldName)} rename to ${quoteIdentifier(newName)}".stripMargin
+    s"alter index ${quoteIdentifier(oldName)} rename to ${quoteIdentifier(newName)}"
 
   def addColumn(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
       | add column ${columnSql(column, false)}""".stripMargin
 
-  def dropColumn(table: TableNode, column: FieldSymbol) =
+  def dropColumn(table: TableNode, column: String) =
     s"""alter table ${quoteTableName(table)}
-      | drop column ${quoteIdentifier(column.name)}""".stripMargin
+      | drop column ${quoteIdentifier(column)}""".stripMargin
 
-  def renameColumn(table: TableNode, column: FieldSymbol, to: FieldSymbol) =
+  def renameColumn(table: TableNode, from: String, to: String) =
+    s"""alter table ${quoteTableName(table)}
+      | alter column ${quoteIdentifier(from)}
+      | rename to ${quoteIdentifier(to)}""".stripMargin
+
+  def alterColumnType(table: TableNode, column: ColumnInfo): Seq[String] = List(
     s"""alter table ${quoteTableName(table)}
       | alter column ${quoteIdentifier(column.name)}
-      | rename to ${quoteIdentifier(to.name)}""".stripMargin
-
-  def alterColumnType(table: TableNode, column: ColumnInfo) =
-    s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(column.name)}
-      | type ${column.sqlType}""".stripMargin
+      | set data type ${column.sqlType}""".stripMargin
+  )
 
   def alterColumnDefault(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}

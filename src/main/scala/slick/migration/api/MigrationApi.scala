@@ -76,15 +76,30 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   trait SqlMigration extends Migration {
-    def sql: String
-    def apply()(implicit session: driver.simple.Session) = session.withStatement()(_ execute sql)
+    def sql: Seq[String]
+    def apply()(implicit session: driver.simple.Session) = {
+      val sq = sql
+      session.withTransaction {
+        session.withStatement() { st =>
+          for(s <- sq)
+            try st execute s
+            catch {
+              case e: java.sql.SQLException =>
+                throw MigrationException(s"Could not execute sql: '$s'", e)
+            }
+        }
+      }
+    }
   }
+
+  //TODO mechanism other than exceptions?
+  case class MigrationException(message: String, cause: Throwable) extends RuntimeException(message, cause)
 
   object SqlMigration {
     def apply(sql: String) = {
       def sql0 = sql
       new SqlMigration {
-        def sql = sql0
+        def sql = Seq(sql0)
       }
     }
   }
@@ -113,17 +128,17 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   case class CreateTable[T <: TableNode](table: T)(columns: (T => Column[_])*) extends SqlMigration with CreateTableBase[T] {
     protected val fss = columns flatMap (f => fieldSym(Node(f(table))))
 
-    def sql = dialect.createTable(table, fss map columnInfo)
+    def sql = Seq(dialect.createTable(table, fss map columnInfo))
 
     def reverse = DropTable(table)
   }
 
   case class DropTable(table: TableNode) extends SqlMigration {
-    def sql = dialect.dropTable(table)
+    def sql = Seq(dialect.dropTable(table))
   }
 
   case class RenameTable(table: TableNode, to: String) extends SqlMigration {
-    def sql = dialect.renameTable(table, to)
+    def sql = Seq(dialect.renameTable(table, to))
   }
 
   object CreateForeignKey {
@@ -131,10 +146,10 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
       new ReversibleMigrationSeq(fkq.fks.map(new CreateForeignKey(_)): _*)
   }
   case class CreateForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
-    def sql = fk.sourceTable match {
+    def sql = Seq(fk.sourceTable match {
       case sourceTable: TableNode =>
         dialect.createForeignKey(sourceTable, fk.name, fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq), fk.targetTable, fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym(_).toSeq), fk.onUpdate, fk.onDelete)
-    }
+    })
 
     def reverse = DropForeignKey(fk)
   }
@@ -144,60 +159,60 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
       new ReversibleMigrationSeq(fkq.fks.map(new DropForeignKey(_)): _*)
   }
   case class DropForeignKey(fk: ForeignKey[_ <: TableNode, _]) extends SqlMigration with ReversibleMigration {
-    def sql = fk.sourceTable match {
+    def sql = Seq(fk.sourceTable match {
       case sourceTable: TableNode =>
         dialect.dropForeignKey(sourceTable, fk.name)
-    }
+    })
     def reverse = CreateForeignKey(fk)
   }
 
   case class CreatePrimaryKey[T <: TableNode](table: T)(key: T => PrimaryKey) extends SqlMigration with ReversibleMigration {
-    def sql = {
+    def sql = Seq({
       val pk = key(table)
       dialect.createPrimaryKey(table, pk.name, pk.columns flatMap (fieldSym(_)))
-    }
+    })
     def reverse = DropPrimaryKey(table)(key)
   }
 
   case class DropPrimaryKey[T <: TableNode](table: T)(key: T => PrimaryKey) extends SqlMigration with ReversibleMigration {
-    def sql = dialect.dropPrimaryKey(table, key(table).name)
+    def sql = Seq(dialect.dropPrimaryKey(table, key(table).name))
     def reverse = CreatePrimaryKey(table)(key)
   }
 
   case class CreateIndex(index: Index) extends SqlMigration with ReversibleMigration {
-    def sql = dialect.createIndex(index.table, index.name, index.unique, index.on flatMap (fieldSym(_)))
+    def sql = Seq(dialect.createIndex(index.table, index.name, index.unique, index.on flatMap (fieldSym(_))))
     def reverse = DropIndex(index)
   }
 
   case class DropIndex(index: Index) extends SqlMigration with ReversibleMigration {
-    def sql = dialect.dropIndex(index.name)
+    def sql = Seq(dialect.dropIndex(index.name))
     def reverse = CreateIndex(index)
   }
 
   case class RenameIndex(index: Index, to: String) extends SqlMigration {
-    def sql = dialect.renameIndex(index.name, to)
+    def sql = Seq(dialect.renameIndex(index.name, to))
   }
 
   case class AddColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {
-    def sql = dialect.addColumn(table, columnInfo(column(table)))
+    def sql = Seq(dialect.addColumn(table, columnInfo(column(table))))
     def reverse = DropColumn(table)(column)
   }
   case class DropColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {
-    def sql = dialect.dropColumn(table, fieldSym(column(table)))
+    def sql = Seq(dialect.dropColumn(table, fieldSym(column(table)).name))
     def reverse = AddColumn(table)(column)
   }
 
   case class RenameColumn[T <: TableNode](table: T)(oldColumn: T => Column[_], newColumn: T => Column[_]) extends SqlMigration {
-    def sql = dialect.renameColumn(table, fieldSym(oldColumn(table)), fieldSym(newColumn(table)))
+    def sql = Seq(dialect.renameColumn(table, fieldSym(oldColumn(table)).name, fieldSym(newColumn(table)).name))
   }
 
   case class AlterColumnType[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
     def sql = dialect.alterColumnType(table, columnInfo(column(table)))
   }
   case class AlterColumnDefault[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
-    def sql = dialect.alterColumnDefault(table, columnInfo(column(table)))
+    def sql = Seq(dialect.alterColumnDefault(table, columnInfo(column(table))))
   }
   case class AlterColumnNullability[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {
-    def sql = dialect.alterColumnNullability(table, columnInfo(column(table)))
+    def sql = Seq(dialect.alterColumnNullability(table, columnInfo(column(table))))
   }
 }
