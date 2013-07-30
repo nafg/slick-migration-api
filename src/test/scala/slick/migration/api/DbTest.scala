@@ -28,7 +28,9 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
     session.close()
   }
 
-  def getTables(implicit session: JdbcBackend#Session) = MTable.getTables.list
+  val catalog, schema = Option("")
+
+  def getTables(implicit session: JdbcBackend#Session) = MTable.getTables(catalog, schema, None, None).list
   def getTable(name: String)(implicit session: JdbcBackend#Session) =
     getTables.find(_.name.name == name)
 
