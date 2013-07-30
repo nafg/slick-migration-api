@@ -9,7 +9,7 @@ import java.util.logging.{Level, Logger}
 import scala.slick.jdbc.GetResult._
 import java.sql.SQLException
 
-class H2Test extends DbTest(new JdbcTestDB("h2mem") {
+class H2Test extends DbTest[H2Driver](new JdbcTestDB("h2mem") {
   type Driver = H2Driver.type
   val driver = H2Driver
   val url = "jdbc:h2:mem:test1"
@@ -18,18 +18,18 @@ class H2Test extends DbTest(new JdbcTestDB("h2mem") {
   override lazy val capabilities = driver.capabilities + TestDB.plainSql + TestDB.plainSqlWide
 })
 
-class HsqldbTest extends DbTest(new HsqlDB("hsqldbmem") {
+class HsqldbTest extends DbTest[HsqldbDriver](new HsqlDB("hsqldbmem") {
   val dbName = "test1"
   val url = "jdbc:hsqldb:mem:"+dbName+";user=SA;password=;shutdown=true"
   override def isPersistent = false
 })
 
-class SqliteTest extends DbTest(new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
+class SqliteTest extends DbTest[SQLiteDriver](new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
   override def isPersistent = false
   override def isShared = false
 })
 
-class DerbyTest extends DbTest(new DerbyDB("derbymem") {
+class DerbyTest extends DbTest[DerbyDriver](new DerbyDB("derbymem") {
   val dbName = "test1"
   val url = "jdbc:derby:memory:"+dbName+";create=true"
   override def cleanUpBefore() = {

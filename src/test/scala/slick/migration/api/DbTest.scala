@@ -12,12 +12,12 @@ import org.scalatest.matchers.ShouldMatchers
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
 
-abstract class DbTest[TDB <: JdbcTestDB](val tdb: TDB) extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
+abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Driver <: Drv })(implicit hasDialect: HasDialect[Drv]) extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
   implicit lazy val session = tdb.createDB.createSession
 
-  lazy val driver = tdb.driver
+  lazy val driver: Drv = tdb.driver
 
-  object migrations extends Migrations(driver)
+  object migrations extends Migrations[Drv](driver)
 
   import migrations._
   import driver.simple._
