@@ -105,21 +105,21 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
   }
 
   test("CreateForeignKey, DropForeignKey") {
-    object table1 extends Table[(Long, Long)]("table1") {
+    object table2 extends Table[(Long, Long)]("table2") {
       def id = column[Long]("id", O.PrimaryKey)
       def other = column[Long]("other")
 
       def * = id ~ other
       // not a def, so equality works
-      lazy val fk = foreignKey("fk_other", other, table2)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
     }
-    object table2 extends Table[Long]("table2") {
+    object table3 extends Table[Long]("table3") {
       def id = column[Long]("id", O.PrimaryKey)
       def * = id
     }
 
-    CreateTable(table1)(_.id, _.other)()
-    CreateTable(table2)(_.id)()
+    CreateTable(table2)(_.id, _.other)()
+    CreateTable(table3)(_.id)()
 
     def fks = getTables.to[Set] map { t =>
       (
@@ -133,34 +133,34 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
     val before = fks
 
     before should equal (Set(
-      ("table1", Nil),
-      ("table2", Nil)
+      ("table2", Nil),
+      ("table3", Nil)
     ))
 
-    val createForeignKey = CreateForeignKey(table1.fk)
+    val createForeignKey = CreateForeignKey(table2.fk)
     createForeignKey()
 
     fks should equal (Set(
-      ("table1", ("table2", "id", "table1", "other", ForeignKeyAction.Cascade, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil),
-      ("table2", Nil)
+      ("table2", ("table2", "id", "table1", "other", ForeignKeyAction.Cascade, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil),
+      ("table3", Nil)
     ))
 
     val dropForeignKey = createForeignKey.reverse
     inside(dropForeignKey.migrations.toList) {
       case DropForeignKey(fk) :: Nil =>
-        Seq(fk) should equal (table1.fk.fks)
+        Seq(fk) should equal (table2.fk.fks)
     }
 
     dropForeignKey()
 
     fks should equal (before)
 
-    DropTable(table1)()
     DropTable(table2)()
+    DropTable(table3)()
   }
 
   test("CreateIndex, DropIndex") {
-    object table1 extends Table[(Long, Int, Int, Int)]("table1") {
+    object table4 extends Table[(Long, Int, Int, Int)]("table4") {
       def id = column[Long]("id")
       def col1 = column[Int]("col1")
       def col2 = column[Int]("col2")
@@ -170,91 +170,91 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
       val index2 = index("index2", col2 ~ col3, true)
     }
 
-    def indexList = getTable("table1").map(_.getIndexInfo().list) getOrElse Nil
+    def indexList = getTable("table4").map(_.getIndexInfo().list) getOrElse Nil
     def indexes = indexList
       .groupBy(i => (i.indexName, !i.nonUnique))
       .mapValues {
         _ collect {
-          case MIndexInfo(MQName(_, _, "table1"), _, _, _, _, seq, col, _, _, _, _) =>
+          case MIndexInfo(MQName(_, _, "table4"), _, _, _, _, seq, col, _, _, _, _) =>
             (seq, col)
         }
       }
 
-    CreateTable(table1)(_.id, _.col1, _.col2, _.col3)()
+    CreateTable(table4)(_.id, _.col1, _.col2, _.col3)()
 
-    val createIndexes = CreateIndex(table1.index1) & CreateIndex(table1.index2)
+    val createIndexes = CreateIndex(table4.index1) & CreateIndex(table4.index2)
     createIndexes()
 
     indexes(Some("index1") -> false) should equal (List((1, Some("col1"))))
     indexes(Some("index2") -> true) should equal (List((1, Some("col2")), (2, Some("col3"))))
 
-    createIndexes.reverse should equal (DropIndex(table1.index2) & DropIndex(table1.index1))
+    createIndexes.reverse should equal (DropIndex(table4.index2) & DropIndex(table4.index1))
 
     createIndexes.reverse()
 
-    DropTable(table1)()
+    DropTable(table4)()
   }
 
   test("AddColumn, DropColumn") {
-    object table1 extends Table[(Long, String)]("table1") {
+    object table5 extends Table[(Long, String)]("table5") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2")
       def * = col1 ~ col2
     }
 
-    CreateTable(table1)(_.col1)()
+    CreateTable(table5)(_.col1)()
 
-    def columnsCount = getTable("table1").map(_.getColumns.list.length)
+    def columnsCount = getTable("table5").map(_.getColumns.list.length)
 
     columnsCount should equal (Some(1))
 
-    val addColumn = AddColumn(table1)(_.col2)
+    val addColumn = AddColumn(table5)(_.col2)
     addColumn()
 
     columnsCount should equal (Some(2))
 
     val dropColumn = addColumn.reverse
-    dropColumn should equal (DropColumn(table1)(_.col2))
+    dropColumn should equal (DropColumn(table5)(_.col2))
 
     dropColumn()
 
     columnsCount should equal (Some(1))
 
-    DropTable(table1)()
+    DropTable(table5)()
   }
 
   test("AlterColumnType/Default/Nullability") {
-    object table1 extends Table[Long]("table1") {
+    object table6 extends Table[Long]("table6") {
       def id = column[Long]("id", O.Default(20), O.NotNull)
       def * = id
     }
 
-    CreateTable(table1)(_.column[String]("id", table1.O.Nullable))()
+    CreateTable(table6)(_.column[String]("id", table1.O.Nullable))()
 
-    def columns = getTable("table1").map(_.getColumns.list.map {
+    def columns = getTable("table6").map(_.getColumns.list.map {
       case col => (col.column, col.sqlType, col.columnDef)
     }) getOrElse Nil
 
     columns.toList should equal (List(("id", Types.VARCHAR, None)))
 
-    try table1.insert(null)
+    try table6.insert(null)
     catch {
       case e: SQLException =>
         fail("Could not insert NULL")
     }
-    Query(table1).delete
+    Query(table6).delete
 
-    val m = AlterColumnType(table1)(_.id) &
-      AlterColumnDefault(table1)(_.id) &
-      AlterColumnNullability(table1)(_.id)
+    val m = AlterColumnType(table6)(_.id) &
+      AlterColumnDefault(table6)(_.id) &
+      AlterColumnNullability(table6)(_.id)
     m()
 
     columns.toList should equal (List(("id", Types.BIGINT, Some("20"))))
     intercept[SQLException] {
-      table1.insert(null)
+      table6.insert(null)
     }
 
-    DropTable(table1)()
+    DropTable(table6)()
   }
 
   test("RenameTable/Column/Index") {
@@ -264,7 +264,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
       val index1 = index("oldname", col1)
     }
     object oldname extends Table[Long]("oldname") with tables
-    object table1 extends Table[Long]("table1") with tables
+    object table7 extends Table[Long]("table7") with tables
 
     CreateTable(oldname)(_.col1).withIndexes(_.index1)()
 
@@ -276,14 +276,14 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
     columns should equal (List("oldname"))
     indexes should equal (List("oldname"))
 
-    RenameTable(oldname, "table1")()
-    RenameColumn(table1)(_.col1, _.column[Long]("col1"))()
-    RenameIndex(table1.index1, "index1")()
+    RenameTable(oldname, "table7")()
+    RenameColumn(table7)(_.col1, _.column[Long]("col1"))()
+    RenameIndex(table7.index1, "index1")()
 
-    tables should equal (List("table1"))
+    tables should equal (List("table7"))
     columns should equal (List("col1"))
     indexes should equal (List("index1"))
 
-    DropTable(table1)()
+    DropTable(table7)()
   }
 }
