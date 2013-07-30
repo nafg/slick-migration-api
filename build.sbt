@@ -14,7 +14,7 @@ libraryDependencies += "com.h2database"      % "h2"                   % "1.3.170
 
 libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.7.2"         % "test"
 
-libraryDependencies += "org.apache.derby"    % "derby"                % "10.9.1.0"      % "test"
+libraryDependencies += "org.apache.derby"    % "derby"                % "10.10.1.1"      % "test"
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.2.8"         % "test"
 

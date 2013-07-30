@@ -111,7 +111,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
 
       def * = id ~ other
       // not a def, so equality works
-      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.Cascade, ForeignKeyAction.Cascade)
+      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.Restrict, ForeignKeyAction.Cascade)
     }
     object table3 extends Table[Long]("table3") {
       def id = column[Long]("id", O.PrimaryKey)
@@ -124,7 +124,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
     def fks = getTables.to[Set] map { t =>
       (
         t.name.name,
-        t.getImportedKeys.list map { fk =>
+        t.getExportedKeys.list map { fk =>
           (fk.pkTable.name, fk.pkColumn, fk.fkTable.name, fk.fkColumn, fk.updateRule, fk.deleteRule, fk.fkName)
         }
       )
@@ -141,8 +141,8 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
     createForeignKey()
 
     fks should equal (Set(
-      ("table2", ("table2", "id", "table1", "other", ForeignKeyAction.Cascade, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil),
-      ("table3", Nil)
+      ("table2", Nil),
+      ("table3", ("table3", "id", "table2", "other", ForeignKeyAction.Restrict, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil)
     ))
 
     val dropForeignKey = createForeignKey.reverse
@@ -198,7 +198,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
   test("AddColumn, DropColumn") {
     object table5 extends Table[(Long, String)]("table5") {
       def col1 = column[Long]("col1")
-      def col2 = column[String]("col2")
+      def col2 = column[String]("col2", O.Default(""))
       def * = col1 ~ col2
     }
 
@@ -224,23 +224,24 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
   }
 
   test("AlterColumnType/Default/Nullability") {
-    object table6 extends Table[Long]("table6") {
-      def id = column[Long]("id", O.Default(20), O.NotNull)
+    object table6 extends Table[String]("table6") {
+      def tmpOldId = column[java.sql.Date]("id", table6.O.Nullable)
+      def id = column[String]("id", O.Default("abc"), O.NotNull)
       def * = id
     }
 
-    CreateTable(table6)(_.column[String]("id", table1.O.Nullable))()
+    CreateTable(table6)(_.tmpOldId)()
 
     def columns = getTable("table6").map(_.getColumns.list.map {
       case col => (col.column, col.sqlType, col.columnDef)
     }) getOrElse Nil
 
-    columns.toList should equal (List(("id", Types.VARCHAR, None)))
+    columns.toList should equal (List(("id", Types.DATE, None)))
 
-    try table6.insert(null)
+    try table6.tmpOldId.insert(null: java.sql.Date)
     catch {
       case e: SQLException =>
-        fail("Could not insert NULL")
+        fail("Could not insert NULL: " + e)
     }
     Query(table6).delete
 
@@ -249,9 +250,9 @@ abstract class DbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Drive
       AlterColumnNullability(table6)(_.id)
     m()
 
-    columns.toList should equal (List(("id", Types.BIGINT, Some("20"))))
+    columns.toList should equal (List(("id", Types.VARCHAR, Some("'abc'"))))
     intercept[SQLException] {
-      table6.insert(null)
+      table6.id.insert(null: String)
     }
 
     DropTable(table6)()

@@ -37,7 +37,10 @@ class DerbyTest extends DbTest[DerbyDriver](new DerbyDB("derbymem") {
     try { profile.backend.Database.forURL(dropUrl, driver = jdbcDriver) withSession { s:profile.Backend#Session => s.conn } }
     catch { case e: SQLException => }
   }
-})
+}) {
+  override val catalog = None
+  override val schema = Some("APP")
+}
 
 
 // copied from slick-testkit
