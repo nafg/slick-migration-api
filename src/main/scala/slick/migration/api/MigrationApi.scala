@@ -7,6 +7,8 @@ import ast._
 
 case class ColumnInfo(name: String, sqlType: String, notNull: Boolean, autoInc: Boolean, isPk: Boolean, default: Option[String])
 
+case class IndexInfo(table: TableNode, name: String, unique: Boolean, columns: Seq[FieldSymbol])
+
 class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect[D]) {
 
   val dialect = hasDialect.f(driver)
@@ -37,6 +39,8 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
 
   protected def fieldSym(column: Column[_]): FieldSymbol =
     fieldSym(Node(column)) getOrElse sys.error("Invalid column: " + column)
+
+  def indexInfo(index: Index) = IndexInfo(index.table, index.name, index.unique, index.on flatMap (fieldSym(_)))
 
   trait Migration {
     def apply()(implicit session: driver.simple.Session): Unit
@@ -180,7 +184,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class CreateIndex(index: Index) extends SqlMigration with ReversibleMigration {
-    def sql = Seq(dialect.createIndex(index.table, index.name, index.unique, index.on flatMap (fieldSym(_))))
+    def sql = Seq(dialect.createIndex(indexInfo(index)))
     def reverse = DropIndex(index)
   }
 
@@ -190,7 +194,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class RenameIndex(index: Index, to: String) extends SqlMigration {
-    def sql = Seq(dialect.renameIndex(index.name, to))
+    def sql = dialect.renameIndex(indexInfo(index), to)
   }
 
   case class AddColumn[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration with ReversibleMigration {

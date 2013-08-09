@@ -1,13 +1,16 @@
 package scala.slick
 package migration.api
 
-import com.typesafe.slick.testkit.util.JdbcTestDB
-import scala.slick.driver._
-import com.typesafe.slick.testkit.util.TestDB
-import scala.slick.jdbc.{ResultSetInvoker, StaticQuery => Q}
-import java.util.logging.{Level, Logger}
-import scala.slick.jdbc.GetResult._
 import java.sql.SQLException
+import java.util.logging.{Level, Logger}
+
+import scala.slick.driver._
+import scala.slick.jdbc.{ResultSetInvoker, StaticQuery => Q}
+import scala.slick.jdbc.GetResult._
+import scala.slick.jdbc.JdbcBackend
+
+import com.typesafe.slick.testkit.util.JdbcTestDB
+import com.typesafe.slick.testkit.util.TestDB
 
 class H2Test extends DbTest[H2Driver](new JdbcTestDB("h2mem") {
   type Driver = H2Driver.type
@@ -24,10 +27,17 @@ class HsqldbTest extends DbTest[HsqldbDriver](new HsqlDB("hsqldbmem") {
   override def isPersistent = false
 })
 
-class SqliteTest extends DbTest[SQLiteDriver](new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
+class SqliteTest extends BasicDbTest[SQLiteDriver](new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
   override def isPersistent = false
   override def isShared = false
-})
+}) {
+  override def getTables(implicit session: JdbcBackend#Session) =
+    super.getTables.filterNot(t =>
+      t.name.name == "sqlite_sequence" ||
+      t.name.name.startsWith("sqlite_autoindex_")
+    )
+  override def longJdbcType = java.sql.Types.INTEGER
+}
 
 class DerbyTest extends DbTest[DerbyDriver](new DerbyDB("derbymem") {
   val dbName = "test1"
