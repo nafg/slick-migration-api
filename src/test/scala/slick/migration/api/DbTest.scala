@@ -31,6 +31,8 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
 
   val catalog, schema = Option("")
 
+  def noActionReturns: ForeignKeyAction = ForeignKeyAction.NoAction
+
   def getTables(implicit session: JdbcBackend#Session) = MTable.getTables(catalog, schema, None, None).list
   def getTable(name: String)(implicit session: JdbcBackend#Session) =
     getTables.find(_.name.name == name)
@@ -209,7 +211,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
 
       def * = id ~ other
       // not a def, so equality works
-      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.Restrict, ForeignKeyAction.Cascade)
+      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.NoAction, ForeignKeyAction.Cascade)
     }
     object table3 extends Table[Long]("table3") {
       def id = column[Long]("id", O.PrimaryKey)
@@ -241,7 +243,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
 
       fks should equal (Set(
         ("table2", Nil),
-        ("table3", ("table3", "id", "table2", "other", ForeignKeyAction.Restrict, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil)
+        ("table3", ("table3", "id", "table2", "other", noActionReturns, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil)
       ))
 
       val dropForeignKey = createForeignKey.reverse

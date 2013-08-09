@@ -19,13 +19,18 @@ class H2Test extends DbTest[H2Driver](new JdbcTestDB("h2mem") {
   val jdbcDriver = "org.h2.Driver"
   override def isPersistent = false
   override lazy val capabilities = driver.capabilities + TestDB.plainSql + TestDB.plainSqlWide
-})
+}) {
+  override def noActionReturns = scala.slick.lifted.ForeignKeyAction.Restrict
+}
 
 class HsqldbTest extends DbTest[HsqldbDriver](new HsqlDB("hsqldbmem") {
   val dbName = "test1"
   val url = "jdbc:hsqldb:mem:"+dbName+";user=SA;password=;shutdown=true"
   override def isPersistent = false
-})
+}) {
+  override val catalog = None
+  override val schema = Some("PUBLIC")
+}
 
 class SqliteTest extends BasicDbTest[SQLiteDriver](new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
   override def isPersistent = false
