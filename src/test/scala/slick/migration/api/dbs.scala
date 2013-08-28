@@ -10,6 +10,7 @@ import scala.slick.jdbc.GetResult._
 import scala.slick.jdbc.JdbcBackend
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
+import com.typesafe.slick.testkit.util.ExternalJdbcTestDB
 import com.typesafe.slick.testkit.util.TestDB
 
 class H2Test extends DbTest[H2Driver](new JdbcTestDB("h2mem") {
@@ -55,6 +56,36 @@ class DerbyTest extends DbTest[DerbyDriver](new DerbyDB("derbymem") {
 }) {
   override val catalog = None
   override val schema = Some("APP")
+}
+
+class MySQLTest extends DbTest[MySQLDriver](new ExternalJdbcTestDB("mysql") {
+  type Driver = MySQLDriver.type
+  val driver = MySQLDriver
+  override lazy val capabilities = driver.capabilities + TestDB.plainSql + TestDB.plainSqlWide
+}) {
+  override def columnDefaultFormat(s: String) = s
+}
+
+class PostgresTest extends DbTest[PostgresDriver](new ExternalJdbcTestDB("postgres") {
+  type Driver = PostgresDriver.type
+  val driver = PostgresDriver
+  override def getLocalTables(implicit session: profile.Backend#Session) = {
+    val tables = ResultSetInvoker[(String,String,String, String)](_.conn.getMetaData().getTables("", "public", null, null))
+    tables.list.filter(_._4.toUpperCase == "TABLE").map(_._3).sorted
+  }
+  override def getLocalSequences(implicit session: profile.Backend#Session) = {
+    val tables = ResultSetInvoker[(String,String,String, String)](_.conn.getMetaData().getTables("", "public", null, null))
+    tables.list.filter(_._4.toUpperCase == "SEQUENCE").map(_._3).sorted
+  }
+  override lazy val capabilities = driver.capabilities + TestDB.plainSql + TestDB.plainSqlWide
+}) {
+  override val schema = Some("public")
+  override def getTables(implicit session: JdbcBackend#Session) =
+    super.getTables.filter(t =>
+      t.tableType.toUpperCase == "TABLE"
+    )
+  override def longJdbcType = java.sql.Types.INTEGER
+  override def columnDefaultFormat(s: String) = s"'$s'::character varying"
 }
 
 

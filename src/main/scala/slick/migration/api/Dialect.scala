@@ -9,10 +9,12 @@ class HasDialect[D <: JdbcDriver](val f: D => Dialect[D])
 
 object HasDialect {
   implicit def default[D <: JdbcDriver]: HasDialect[D] = new HasDialect(d => new Dialect(d))
-  implicit object derby  extends HasDialect[DerbyDriver ](d => new DerbyDialect(d))
-  implicit object h2     extends HasDialect[H2Driver    ](d => new H2Dialect(d))
-  implicit object sqlite extends HasDialect[SQLiteDriver](d => new SQLiteDialect(d))
-  implicit object hsqldb extends HasDialect[HsqldbDriver](d => new HsqldbDialect(d))
+  implicit object derby    extends HasDialect[DerbyDriver   ](d => new DerbyDialect(d))
+  implicit object h2       extends HasDialect[H2Driver      ](d => new H2Dialect(d))
+  implicit object sqlite   extends HasDialect[SQLiteDriver  ](d => new SQLiteDialect(d))
+  implicit object hsqldb   extends HasDialect[HsqldbDriver  ](d => new HsqldbDialect(d))
+  implicit object mysql    extends HasDialect[MySQLDriver   ](d => new MySQLDialect(d))
+  implicit object postgres extends HasDialect[PostgresDriver](d => new PostgresDialect(d))
 }
 
 class Dialect[D <: JdbcDriver](driver: D) {
@@ -87,8 +89,8 @@ class Dialect[D <: JdbcDriver](driver: D) {
       | index ${quoteIdentifier(index.name)} on ${quoteTableName(index.table)}
       | ${columnList(index.columns)}""".stripMargin
 
-  def dropIndex(name: String) =
-    s"drop index ${quoteIdentifier(name)}"
+  def dropIndex(index: IndexInfo) =
+    s"drop index ${quoteIdentifier(index.name)}"
 
   def renameIndex(old: IndexInfo, newName: String): Seq[String] = List(
     s"alter index ${quoteIdentifier(old.name)} rename to ${quoteIdentifier(newName)}"
@@ -102,9 +104,9 @@ class Dialect[D <: JdbcDriver](driver: D) {
     s"""alter table ${quoteTableName(table)}
       | drop column ${quoteIdentifier(column)}""".stripMargin
 
-  def renameColumn(table: TableNode, from: String, to: String) =
+  def renameColumn(table: TableNode, from: ColumnInfo, to: String) =
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(from)}
+      | alter column ${quoteIdentifier(from.name)}
       | rename to ${quoteIdentifier(to)}""".stripMargin
 
   def alterColumnType(table: TableNode, column: ColumnInfo): Seq[String] = List(
@@ -135,12 +137,12 @@ class DerbyDialect(driver: DerbyDriver) extends Dialect[DerbyDriver](driver) {
       addColumn(table, tmpColumn),
       s"update ${quoteTableName(table)} set ${quoteIdentifier(tmpColumnName)} = ${quoteIdentifier(column.name)}",
       dropColumn(table, column.name),
-      renameColumn(table, tmpColumnName, column.name)
+      renameColumn(table, tmpColumn, column.name)
     )
   }
 
-  override def renameColumn(table: TableNode, from: String, to: String) =
-    s"rename column ${quoteTableName(table)}.${quoteIdentifier(from)} to ${quoteIdentifier(to)}"
+  override def renameColumn(table: TableNode, from: ColumnInfo, to: String) =
+    s"rename column ${quoteTableName(table)}.${quoteIdentifier(from.name)} to ${quoteIdentifier(to)}"
 
   override def alterColumnNullability(table: TableNode, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
@@ -161,11 +163,13 @@ class H2Dialect(driver: H2Driver) extends Dialect[H2Driver](driver) {
   override def autoInc(ci: ColumnInfo) = ""
 }
 
-class SQLiteDialect(driver: SQLiteDriver) extends Dialect[SQLiteDriver](driver) {
+trait SimulatedRenameIndex { this: Dialect[_] =>
+  override def renameIndex(old: IndexInfo, newName: String) =
+    List(dropIndex(old), createIndex(old.copy(name = newName)))
+}
+class SQLiteDialect(driver: SQLiteDriver) extends Dialect[SQLiteDriver](driver) with SimulatedRenameIndex {
   override def columnType(ci: ColumnInfo): String =
     if (ci.autoInc) "INTEGER" else ci.sqlType
-  override def renameIndex(old: IndexInfo, newName: String) =
-    List(dropIndex(old.name), createIndex(old.copy(name = newName)))
 }
 
 class HsqldbDialect(driver: HsqldbDriver) extends Dialect[HsqldbDriver](driver) {
@@ -175,4 +179,50 @@ class HsqldbDialect(driver: HsqldbDriver) extends Dialect[HsqldbDriver](driver) 
     autoInc(ci) + (if (newTable && ci.isPk) " PRIMARY KEY" else "")
   override def notNull(ci: ColumnInfo) =
     if (ci.notNull && !ci.isPk) " NOT NULL" else ""
+}
+
+class MySQLDialect(driver: MySQLDriver) extends Dialect[MySQLDriver](driver) with SimulatedRenameIndex {
+  override def autoInc(ci: ColumnInfo) = if(ci.autoInc) " AUTO_INCREMENT" else ""
+
+  override def quoteIdentifier(id: String): String = {
+    val s = new StringBuilder(id.length + 4) append '`'
+    for (c <- id) if (c == '"') s append "\"\"" else s append c
+    (s append '`').toString
+  }
+
+  override def dropIndex(index: IndexInfo) =
+    s"drop index ${quoteIdentifier(index.name)} on ${quoteTableName(index.table)}"
+
+  override def renameColumn(table: TableNode, from: ColumnInfo, to: String) = {
+    val newCol = from.copy(name = to)
+    s"""alter table ${quoteTableName(table)}
+      | change ${quoteIdentifier(from.name)}
+      | ${columnSql(newCol, false)}""".stripMargin
+  }
+
+  override def alterColumnNullability(table: TableNode, column: ColumnInfo) =
+    renameColumn(table, column, column.name)
+
+  override def alterColumnType(table: TableNode, column: ColumnInfo) =
+    Seq(renameColumn(table, column, column.name))
+
+  override def dropForeignKey(table: TableNode, name: String) =
+    s"alter table ${quoteTableName(table)} drop foreign key ${quoteIdentifier(name)}"
+
+  override def createPrimaryKey(table: TableNode, name: String, columns: Seq[FieldSymbol]) =
+    s"""alter table ${quoteTableName(table)}
+      | add constraint primary key
+      | ${columnList(columns)}""".stripMargin
+  override def dropPrimaryKey(table: TableNode, name: String) =
+    s"alter table ${quoteTableName(table)} drop primary key"
+}
+
+class PostgresDialect(driver: PostgresDriver) extends Dialect[PostgresDriver](driver) {
+  override def columnType(ci: ColumnInfo): String =
+    if (ci.autoInc) "SERIAL" else ci.sqlType
+  override def autoInc(ci: ColumnInfo) = ""
+  override def renameColumn(table: TableNode, from: ColumnInfo, to: String) =
+    s"""alter table ${quoteTableName(table)}
+      | rename column ${quoteIdentifier(from.name)}
+      | to ${quoteIdentifier(to)}""".stripMargin
 }

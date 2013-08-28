@@ -189,7 +189,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class DropIndex(index: Index) extends SqlMigration with ReversibleMigration {
-    def sql = Seq(dialect.dropIndex(index.name))
+    def sql = Seq(dialect.dropIndex(indexInfo(index)))
     def reverse = CreateIndex(index)
   }
 
@@ -207,7 +207,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect
   }
 
   case class RenameColumn[T <: TableNode](table: T)(oldColumn: T => Column[_], newColumn: T => Column[_]) extends SqlMigration {
-    def sql = Seq(dialect.renameColumn(table, fieldSym(oldColumn(table)).name, fieldSym(newColumn(table)).name))
+    def sql = Seq(dialect.renameColumn(table, columnInfo(oldColumn(table)), fieldSym(newColumn(table)).name))
   }
 
   case class AlterColumnType[T <: TableNode](table: T)(column: T => Column[_]) extends SqlMigration {

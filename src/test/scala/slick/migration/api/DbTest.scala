@@ -25,8 +25,8 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
 
   override def beforeAll() = tdb.cleanUpBefore()
   override def afterAll() = {
-    tdb.cleanUpAfter()
     session.close()
+    tdb.cleanUpAfter()
   }
 
   val catalog, schema = Option("")
@@ -38,6 +38,11 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
     getTables.find(_.name.name == name)
 
   def longJdbcType = Types.BIGINT
+
+  /**
+   * How JDBC metadata returns a column's default string value
+   */
+  def columnDefaultFormat(s: String) = s"'$s'"
 
   test("CreateTable, DropTable") {
     object table1 extends Table[(Long, String)]("table1") {
@@ -65,7 +70,7 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
           val autoinc: Map[String, Boolean] = cols.flatMap(col => col.isAutoInc.map(col.column -> _)).toMap
           autoinc.get("id") foreach (_ should equal (true))
           autoinc.get("col1") foreach (_ should equal (false))
-          cols.find(_.column == "col1").flatMap(_.columnDef).foreach(_ should equal ("'abc'"))
+          cols.find(_.column == "col1").flatMap(_.columnDef).foreach(_ should equal (columnDefaultFormat("abc")))
       }
 
       createTable.reverse should equal (DropTable(table1))
@@ -181,20 +186,20 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
       def id = column[Long]("id")
       def stringId = column[String]("stringId")
       def * = id ~ stringId
-      def pk = primaryKey("pk", id ~ stringId)
+      def pk = primaryKey("PRIMARY", id ~ stringId)  // note mysql will always use this name anyway
     }
 
     CreateTable(table8)(_.id, _.stringId)()
 
     val before = pks
 
-    before.get(Some("pk")) should equal (None)
+    before.get(Some("PRIMARY")) should equal (None)
 
     try {
       val createPrimaryKey = CreatePrimaryKey(table8)(_.pk)
       createPrimaryKey()
 
-      pks(Some("pk")) should equal (List(1 -> "id", 2 -> "stringId"))
+      pks(Some("PRIMARY")) should equal (List(1 -> "id", 2 -> "stringId"))
 
       //TODO this doesn't do much since case classes only compare the first parameter list
       createPrimaryKey.reverse should equal (DropPrimaryKey(table8)(_.pk))
@@ -313,7 +318,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
     try {
       columns.toList should equal (List((None)))
       AlterColumnDefault(table9)(_.id)()
-      columns.toList should equal (List((Some("'abc'"))))
+      columns.toList should equal (List((Some(columnDefaultFormat("abc")))))
     } finally DropTable(table9)()
   }
 
