@@ -44,7 +44,7 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
    */
   def columnDefaultFormat(s: String) = s"'$s'"
 
-  test("CreateTable, DropTable") {
+  test("create, drop") {
     object table1 extends Table[(Long, String)]("table1") {
       def id = column[Long]("id", O.NotNull, O.AutoInc, O.PrimaryKey)
       def col1 = column[String]("col1", O.Default("abc"))
@@ -53,7 +53,8 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
 
     val before = getTables
 
-    val createTable = CreateTable(table1)(_.id, _.col1)
+    val tm = TableMigration(table1)
+    val createTable = tm.create.addColumns(_.id, _.col1)
 
     createTable()
 
@@ -73,40 +74,42 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
           cols.find(_.column == "col1").flatMap(_.columnDef).foreach(_ should equal (columnDefaultFormat("abc")))
       }
 
-      createTable.reverse should equal (DropTable(table1))
+      //TODO createTable.reverse should equal (DropTable(table1))
 
     } finally {
-      createTable.reverse()
+      //TODO createTable.reverse()
+      tm.drop.apply()
     }
 
     getTables should equal (before)
   }
 
-  test("AddColumn") {
+  test("addColumns") {
     object table5 extends Table[(Long, String)]("table5") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2", O.Default(""))
       def * = col1 ~ col2
     }
 
-    CreateTable(table5)(_.col1)()
+    val tm = TableMigration(table5)
+    tm.create.addColumns(_.col1)()
 
     def columnsCount = getTable("table5").map(_.getColumns.list.length)
 
     columnsCount should equal (Some(1))
 
-    val addColumn = AddColumn(table5)(_.col2)
+    val addColumn = tm.addColumns(_.col2)
     addColumn()
 
     // note this doesn't actually compare the second argument
-    addColumn.reverse should equal (DropColumn(table5)(_.col2))
+    //TODO addColumn.reverse should equal (DropColumn(table5)(_.col2))
 
     columnsCount should equal (Some(2))
 
-    DropTable(table5)()
+    tm.drop.apply()
   }
 
-  test("CreateIndex, DropIndex") {
+  test("addIndexes, dropIndexes") {
     object table4 extends Table[(Long, Int, Int, Int)]("table4") {
       def id = column[Long]("id")
       def col1 = column[Int]("col1")
@@ -127,22 +130,27 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
         }
       }
 
-    CreateTable(table4)(_.id, _.col1, _.col2, _.col3)()
+    val tm = TableMigration(table4)
+    tm.create.addColumns(_.id, _.col1, _.col2, _.col3)()
 
-    val createIndexes = CreateIndex(table4.index1) & CreateIndex(table4.index2)
-    createIndexes()
+    try {
+      val createIndexes = tm.addIndexes(_.index1, _.index2)
+      createIndexes()
 
-    indexes(Some("index1") -> false) should equal (List((1, Some("col1"))))
-    indexes(Some("index2") -> true) should equal (List((1, Some("col2")), (2, Some("col3"))))
+      indexes(Some("index1") -> false) should equal (List((1, Some("col1"))))
+      indexes(Some("index2") -> true) should equal (List((1, Some("col2")), (2, Some("col3"))))
 
-    createIndexes.reverse should equal (DropIndex(table4.index2) & DropIndex(table4.index1))
+      //TODO createIndexes.reverse should equal (DropIndex(table4.index2) & DropIndex(table4.index1))
 
-    createIndexes.reverse()
+      //TODO createIndexes.reverse()
+      tm.dropIndexes(_.index1, _.index2)()
 
-    DropTable(table4)()
+      indexes.keys.flatMap(_._1).exists(Set("index1", "index2") contains _) should equal (false)
+    } finally
+      tm.drop.apply()
   }
 
-  test("RenameTable/Index") {
+  test("rename, renameIndex") {
     class table(name: String) extends Table[Long](name) {
       def col1 = column[Long]("col1")
       def * = col1
@@ -151,7 +159,8 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
     object oldname extends table("oldname")
     object table7 extends table("table7")
 
-    CreateTable(oldname)(_.col1).withIndexes(_.index1)()
+    val tm = TableMigration(oldname)
+    tm.create.addColumns(_.col1).addIndexes(_.index1)()
 
     def tables = getTables.map(_.name.name).filterNot(_ == "oldIndexName")
     def indexes = getTables.flatMap(_.getIndexInfo().list.flatMap(_.indexName))
@@ -159,13 +168,15 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
     tables should equal (List("oldname"))
     indexes should equal (List("oldIndexName"))
 
-    RenameTable(oldname, "table7")()
+    tm.rename("table7")()
     tables should equal (List("table7"))
 
-    RenameIndex(table7.index1, "index1")()
-    indexes should equal (List("index1"))
-
-    DropTable(table7)()
+    val tm7 = TableMigration(table7)
+    try {
+      tm7.renameIndex(_.index1, "index1")()
+      indexes should equal (List("index1"))
+    } finally
+      tm7.drop.apply()
   }
 }
 
@@ -174,7 +185,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
   import migrations._
   import driver.simple._
 
-  test("CreatePrimaryKey, DropPrimaryKey") {
+  test("addPrimaryKeys, dropPrimaryKeys") {
     def pkList = getTable("table8").map(_.getPrimaryKeys.list) getOrElse Nil
     def pks = pkList
       .groupBy(_.pkName)
@@ -186,30 +197,32 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
       def id = column[Long]("id")
       def stringId = column[String]("stringId")
       def * = id ~ stringId
-      def pk = primaryKey("PRIMARY", id ~ stringId)  // note mysql will always use this name anyway
+      def pk = primaryKey("PRIMARY", id ~ stringId)  // note mysql will always use the name "PRIMARY" anyway
     }
 
-    CreateTable(table8)(_.id, _.stringId)()
+    val tm = TableMigration(table8)
+    tm.create.addColumns(_.id, _.stringId)()
 
     val before = pks
 
     before.get(Some("PRIMARY")) should equal (None)
 
     try {
-      val createPrimaryKey = CreatePrimaryKey(table8)(_.pk)
-      createPrimaryKey()
+      tm.addPrimaryKeys(_.pk)()
 
       pks(Some("PRIMARY")) should equal (List(1 -> "id", 2 -> "stringId"))
 
-      //TODO this doesn't do much since case classes only compare the first parameter list
-      createPrimaryKey.reverse should equal (DropPrimaryKey(table8)(_.pk))
-      createPrimaryKey.reverse()
+      //TODO
+      // createPrimaryKey.reverse should equal (DropPrimaryKey(table8)(_.pk))
+      //TODO
+      // createPrimaryKey.reverse()
+      tm.dropPrimaryKeys(_.pk)()
 
       pks should equal (before)
-    } finally DropTable(table8)()
+    } finally tm.drop.apply()
   }
 
-  test("CreateForeignKey, DropForeignKey") {
+  test("addForeignKeys, dropForeignKeys") {
     object table2 extends Table[(Long, Long)]("table2") {
       def id = column[Long]("id", O.PrimaryKey)
       def other = column[Long]("other")
@@ -223,9 +236,11 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
       def * = id
     }
 
+    val tm2 = TableMigration(table2)
+    val tm3 = TableMigration(table3)
     try {
-      CreateTable(table2)(_.id, _.other)()
-      CreateTable(table3)(_.id)()
+      tm2.create.addColumns(_.id, _.other)()
+      tm3.create.addColumns(_.id)()
 
       def fks = getTables.to[Set] map { t =>
         (
@@ -243,7 +258,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
         ("table3", Nil)
       ))
 
-      val createForeignKey = CreateForeignKey(table2.fk)
+      val createForeignKey = tm2.addForeignKeys(_.fk)
       createForeignKey()
 
       fks should equal (Set(
@@ -251,112 +266,126 @@ abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <:
         ("table3", ("table3", "id", "table2", "other", noActionReturns, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil)
       ))
 
-      val dropForeignKey = createForeignKey.reverse
-      inside(dropForeignKey.migrations.toList) {
-        case DropForeignKey(fk) :: Nil =>
-          Seq(fk) should equal (table2.fk.fks)
-      }
+      val dropForeignKey = // TODO createForeignKey.reverse
+        tm2.dropForeignKeys(_.fk)
+      //TODO
+      // inside(dropForeignKey.migrations.toList) {
+      //   case DropForeignKey(fk) :: Nil =>
+      //     Seq(fk) should equal (table2.fk.fks)
+      // }
 
       dropForeignKey()
 
       fks should equal (before)
     } finally {
-      DropTable(table2)()
-      DropTable(table3)()
+      tm2.drop.apply()
+      tm3.drop.apply()
     }
   }
 
-  test("DropColumn") {
+  test("dropColumns") {
     object table11 extends Table[(Long, String)]("table11") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2", O.Default(""))
       def * = col1 ~ col2
     }
 
-    CreateTable(table11)(_.col1, _.col2)()
+    val tm = TableMigration(table11)
+    tm.create.addColumns(_.col1, _.col2)()
 
     def columnsCount = getTable("table11").map(_.getColumns.list.length)
 
-    columnsCount should equal (Some(2))
+    try {
+      columnsCount should equal (Some(2))
 
-    DropColumn(table11)(_.col2)()
+      tm.dropColumns(_.col2)()
 
-    columnsCount should equal (Some(1))
-
-    DropTable(table11)()
+      columnsCount should equal (Some(1))
+    } finally
+      tm.drop.apply()
   }
 
-  test("AlterColumnType") {
+  test("alterColumnTypes") {
     object table6 extends Table[String]("table6") {
       def tmpOldId = column[java.sql.Date]("id")
       def id = column[String]("id", O.Default(""))
       def * = id
     }
 
-    CreateTable(table6)(_.tmpOldId)()
+    val tm = TableMigration(table6)
+    tm.create.addColumns(_.tmpOldId)()
 
     def columnTypes = getTable("table6").map(_.getColumns.list.map(_.sqlType)) getOrElse Nil
 
     try {
       columnTypes.toList should equal (List(Types.DATE))
-      AlterColumnType(table6)(_.id)()
+      tm.alterColumnTypes(_.id)()
       columnTypes.toList should equal (List(Types.VARCHAR))
-    } finally DropTable(table6)()
+    } finally
+      tm.drop.apply()
   }
 
-  test("AlterColumnDefault") {
+  test("alterColumnDefaults") {
     object table9 extends Table[String]("table9") {
       def tmpOldId = column[String]("id")
       def id = column[String]("id", O.Default("abc"))
       def * = id
     }
 
-    CreateTable(table9)(_.tmpOldId)()
+    val tm = TableMigration(table9)
+    tm.create.addColumns(_.tmpOldId)()
 
     def columns = getTable("table9").map(_.getColumns.list.map(_.columnDef)) getOrElse Nil
 
     try {
       columns.toList should equal (List((None)))
-      AlterColumnDefault(table9)(_.id)()
+      tm.alterColumnDefaults(_.id)()
       columns.toList should equal (List((Some(columnDefaultFormat("abc")))))
-    } finally DropTable(table9)()
+    } finally
+      tm.drop.apply()
   }
 
-  test("AlterColumnNullability") {
+  test("alterColumnNulls") {
     object table10 extends Table[String]("table10") {
       def tmpOldId = column[String]("id", O.Nullable)
       def id = column[String]("id", O.NotNull)
       def * = id
     }
 
-    CreateTable(table10)(_.tmpOldId)()
+    val tm = TableMigration(table10)
+    tm.create.addColumns(_.tmpOldId)()
 
     try {
       table10.tmpOldId.insert(null: String)
       Query(table10).delete
 
-      AlterColumnNullability(table10)(_.id)()
+      tm.alterColumnNulls(_.id)()
 
       intercept[SQLException] {
         table10.id.insert(null: String)
       }
-    } finally DropTable(table10)()
+    } finally
+      tm.drop.apply()
   }
 
-  test("RenameColumn") {
+  test("renameColumn") {
     object table12 extends Table[Long]("table12") {
       def col1 = column[Long]("oldname")
       def * = col1
     }
 
-    def columns = getTables.flatMap(_.getColumns.list.map(_.column))
+    def columns = getTable("table12").toList.flatMap(_.getColumns.list.map(_.column))
 
-    CreateTable(table12)(_.col1)()
-    columns should equal (List("oldname"))
+    val tm = TableMigration(table12)
+    tm.create.addColumns(_.col1)()
 
-    RenameColumn(table12)(_.col1, _.column[Long]("col1"))()
-    columns should equal (List("col1"))
+    try {
+      columns should equal (List("oldname"))
 
-    DropTable(table12)()
+      tm.renameColumn(_.col1, "col1")()
+
+      columns should equal (List("col1"))
+    } finally
+      tm.drop.apply()
   }
 }
