@@ -12,7 +12,7 @@ import org.scalatest.matchers.ShouldMatchers
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
 
-abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Driver <: Drv })(implicit hasDialect: HasDialect[Drv]) extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
+abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type Driver <: Drv })(implicit dialect: Dialect[Drv]) extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
 
   implicit lazy val session = tdb.createDB.createSession
 
@@ -180,7 +180,7 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver](val tdb: JdbcTestDB { type 
   }
 }
 
-abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <: Drv })(implicit hasDialect: HasDialect[Drv]) extends BasicDbTest[Drv](tdb) {
+abstract class DbTest[Drv <: driver.JdbcDriver](tdb: JdbcTestDB { type Driver <: Drv })(implicit dialect: Dialect[Drv]) extends BasicDbTest[Drv](tdb) {
 
   import migrations._
   import driver.simple._

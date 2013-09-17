@@ -50,28 +50,6 @@ trait TableMigrationBase {
 }
 
 trait AstHelpers {
-  def driver: JdbcDriver
-
-  protected def columnInfo(column: FieldSymbol): ColumnInfo = {
-    val ti = driver.typeInfoFor(column.tpe)
-    val initial = ColumnInfo(column.name, ti.sqlTypeName, !ti.nullable, false, false, None)
-    column.options.foldLeft(initial){
-      case (ci, ColumnOption.DBType(s))  => ci.copy(sqlType = s)
-      case (ci, ColumnOption.NotNull)    => ci.copy(notNull = true)
-      case (ci, ColumnOption.Nullable)   => ci.copy(notNull = false)
-      case (ci, ColumnOption.AutoInc)    => ci.copy(autoInc = true)
-      case (ci, ColumnOption.PrimaryKey) => ci.copy(isPk = true)
-      case (ci, ColumnOption.Default(v)) => ci.copy(default = Some(ti.valueToSQLLiteral(v)))
-      case (ci, _)                       => ci
-    }
-  }
-
-  protected def columnInfo(column: Column[_]): ColumnInfo =
-    fieldSym(Node(column)) match {
-      case Some(c) => columnInfo(c)
-      case None    => sys.error("Invalid column: " + column)
-    }
-
   protected def tableInfo(table: TableNode): TableInfo = TableInfo(table.schemaName, table.tableName)
 
   protected def fieldSym(node: Node): Option[FieldSymbol] = node match {
@@ -85,9 +63,25 @@ trait AstHelpers {
   protected def indexInfo(index: Index) = IndexInfo(index.table, index.name, index.unique, index.on flatMap (fieldSym(_)))
 }
 
-class Migrations[D <: JdbcDriver](val driver: D)(implicit hasDialect: HasDialect[D]) extends AstHelpers {
-
-  val dialect = hasDialect.f(driver)
+class Migrations[D <: JdbcDriver](val driver: D)(implicit dialect: Dialect[D]) extends AstHelpers {
+  private def columnInfo(column: FieldSymbol): ColumnInfo = {
+    val ti       = driver.typeInfoFor(column.tpe)
+    val initial  = ColumnInfo(column.name, ti.sqlTypeName, !ti.nullable, false, false, None)
+    column.options.foldLeft(initial) {
+      case (ci, ColumnOption.DBType(s))   => ci.copy(sqlType = s)
+      case (ci, ColumnOption.NotNull)     => ci.copy(notNull = true)
+      case (ci, ColumnOption.Nullable)    => ci.copy(notNull = false)
+      case (ci, ColumnOption.AutoInc)     => ci.copy(autoInc = true)
+      case (ci, ColumnOption.PrimaryKey)  => ci.copy(isPk = true)
+      case (ci, ColumnOption.Default(v))  => ci.copy(default = Some(ti.valueToSQLLiteral(v)))
+      case (ci, _)                        => ci
+    }
+  }
+  private def columnInfo(column: Column[_]): ColumnInfo =
+    fieldSym(Node(column)) match {
+      case Some(c) => columnInfo(c)
+      case None    => sys.error("Invalid column: " + column)
+    }
 
   trait Migration {
     def apply()(implicit session: driver.simple.Session): Unit
