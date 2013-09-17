@@ -10,12 +10,12 @@ class MigrationSeqTest extends FunSuite with ShouldMatchers {
     object migrations extends Migrations(H2Driver)
     import migrations._
     val m = new Migration {
-      def apply()(implicit s: driver.simple.Session) = ???
+      def apply()(implicit s: driver.simple.Session) = ()
     }
     m & m & m should equal (MigrationSeq(m, m, m))
 
     val rm = new ReversibleMigration {
-      def apply()(implicit s: driver.simple.Session) = ???
+      def apply()(implicit s: driver.simple.Session) = ()
       def reverse = ???
     }
 

@@ -1,9 +1,10 @@
 package scala.slick
 package migration.api
 
-import driver.JdbcDriver
-import lifted._
-import ast._
+import scala.slick.jdbc.JdbcBackend
+import scala.slick.driver.JdbcDriver
+import scala.slick.lifted._
+import scala.slick.ast._
 
 case class TableInfo(schemaName: Option[String], tableName: String)
 
@@ -84,7 +85,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit dialect: Dialect[D]) e
     }
 
   trait Migration {
-    def apply()(implicit session: driver.simple.Session): Unit
+    def apply()(implicit session: JdbcBackend#Session): Unit
   }
 
   object Migration {
@@ -113,7 +114,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit dialect: Dialect[D]) e
   }
 
   case class MigrationSeq(migrations: Migration*) extends Migration {
-    final def apply()(implicit session: driver.simple.Session) = migrations foreach (_())
+    final def apply()(implicit session: JdbcBackend#Session) = migrations foreach (_())
   }
 
   class ReversibleMigrationSeq(override val migrations: ReversibleMigration*) extends MigrationSeq(migrations: _*) with ReversibleMigration {
@@ -122,7 +123,7 @@ class Migrations[D <: JdbcDriver](val driver: D)(implicit dialect: Dialect[D]) e
 
   trait SqlMigration extends Migration {
     def sql: Seq[String]
-    def apply()(implicit session: driver.simple.Session) = {
+    def apply()(implicit session: JdbcBackend#Session) = {
       val sq = sql
       session.withTransaction {
         session.withStatement() { st =>
