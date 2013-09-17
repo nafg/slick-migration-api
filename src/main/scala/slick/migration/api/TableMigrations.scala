@@ -5,85 +5,57 @@ import scala.slick.driver.JdbcDriver
 import scala.slick.ast.{ FieldSymbol, Node, TableNode }
 import scala.slick.lifted.{ Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey }
 
-class TableMigrations[D <: JdbcDriver](driver: D)(implicit dialect: Dialect[D]) {
-  object TableMigration {
-    def apply[T <: TableNode](tableNode: T) = new TableMigration(tableNode)
-  }
-  class TableMigration[T <: TableNode](tableNode: T)
-    extends SqlMigration with AstHelpers { outer =>
-    // not reversible:
-    def tableDrop: Boolean = false
-    // reverse: create=false, drop=true
-    def tableCreate: Boolean = false
-    // reverse: reverse rename
-    def tableRename: Option[String] = None
-    // reverse: drop instead of create
-    def columnsCreate: Seq[ColumnInfo] = Nil
-    // reverse: create instead of drop
-    def columnsDrop: Seq[ColumnInfo] = Nil
-    // reverse: reverse rename
-    def columnsRename: Map[ColumnInfo, String] = Map.empty
-    // not reversible: insufficient info: don't have old data
-    def columnsAlterType: Seq[ColumnInfo] = Nil
-    // not reversible: insufficient info: don't have old data
-    def columnsAlterDefault: Seq[ColumnInfo] = Nil
-    // not reversible: insufficient info: don't have old data
-    def columnsAlterNullability: Seq[ColumnInfo] = Nil
-    // reverse: drop instead of create
-    def foreignKeysCreate: Seq[ForeignKey[_ <: TableNode, _]] = Nil
-    // not reversible: insufficient info
-    def foreignKeysDrop: Seq[ForeignKey[_ <: TableNode, _]] = Nil
-    //TODO is multiple pks possible?
-    // reverse: drop instead of create
-    def primaryKeysCreate: Seq[(String, Seq[FieldSymbol])] = Nil
-    // reverse: create instead of drop
-    def primaryKeysDrop: Seq[(String, Seq[FieldSymbol])] = Nil
-    // reverse: drop instead of create
-    def indexesCreate: Seq[IndexInfo] = Nil
-    // reverse: create instead of drop
-    def indexesDrop: Seq[IndexInfo] = Nil
-    // reverse: reverse rename
-    def indexesRename: Map[IndexInfo, String] = Map.empty
+case class TableMigrationData(
+  // not reversible: insufficient info: don't know entire old table
+  tableDrop: Boolean = false,
+  // reverse: create=false, drop=true
+  tableCreate: Boolean = false,
+  // reverse: reverse rename
+  tableRename: Option[String] = None,
+  // reverse: drop instead of create
+  columnsCreate: Seq[ColumnInfo] = Nil,
+  // reverse: create instead of drop
+  columnsDrop: Seq[ColumnInfo] = Nil,
+  // reverse: reverse rename
+  columnsRename: Map[ColumnInfo, String] = Map.empty,
+  // not reversible: insufficient info: don't have old data
+  columnsAlterType: Seq[ColumnInfo] = Nil,
+  // not reversible: insufficient info: don't have old data
+  columnsAlterDefault: Seq[ColumnInfo] = Nil,
+  // not reversible: insufficient info: don't have old data
+  columnsAlterNullability: Seq[ColumnInfo] = Nil,
+  // reverse: drop instead of create
+  foreignKeysCreate: Seq[ForeignKey[_ <: TableNode, _]] = Nil,
+  // reverse: create instead of drop
+  foreignKeysDrop: Seq[ForeignKey[_ <: TableNode, _]] = Nil,
+  // reverse: drop instead of create
+  primaryKeysCreate: Seq[(String, Seq[FieldSymbol])] = Nil,
+  // reverse: create instead of drop
+  primaryKeysDrop: Seq[(String, Seq[FieldSymbol])] = Nil,
+  // reverse: drop instead of create
+  indexesCreate: Seq[IndexInfo] = Nil,
+  // reverse: create instead of drop
+  indexesDrop: Seq[IndexInfo] = Nil,
+  // reverse: reverse rename
+  indexesRename: Map[IndexInfo, String] = Map.empty
+)
 
-    def sql = dialect.migrateTable(this)
+class TableMigrations[D <: JdbcDriver](driver: D)(implicit dialect: Dialect[D]) {
+
+  object TableMigration {
+    def apply[T <: TableNode](tableNode: T) = new ReversibleTableMigration(tableNode, TableMigrationData())
+  }
+  sealed abstract class TableMigration[T <: TableNode](tableNode: T)
+    extends SqlMigration with AstHelpers with Equals { outer =>
+    type Self <: TableMigration[T]
+
+    def sql = dialect.migrateTable(table, data)
 
     def table = TableInfo(tableNode.schemaName, tableNode.tableName)
 
-    protected def copy(
-      tblDrop: Boolean = tableDrop,
-      tblCreate: Boolean = tableCreate,
-      tblRename: Option[String] = tableRename,
-      colCreate: Seq[ColumnInfo] = columnsCreate,
-      colDrop: Seq[ColumnInfo] = columnsDrop,
-      colRename: Map[ColumnInfo, String] = columnsRename,
-      colAlterType: Seq[ColumnInfo] = columnsAlterType,
-      colAlterDefault: Seq[ColumnInfo] = columnsAlterDefault,
-      colAlterNullability: Seq[ColumnInfo] = columnsAlterNullability,
-      frgnKeysCreate: Seq[ForeignKey[_ <: TableNode, _]] = foreignKeysCreate,
-      frgnKeysDrop: Seq[ForeignKey[_ <: TableNode, _]] = foreignKeysDrop,
-      prmryKeysCreate: Seq[(String, Seq[FieldSymbol])] = primaryKeysCreate,
-      prmryKeysDrop: Seq[(String, Seq[FieldSymbol])] = primaryKeysDrop,
-      idxCreate: Seq[IndexInfo] = indexesCreate,
-      idxDrop: Seq[IndexInfo] = indexesDrop,
-      idxRename: Map[IndexInfo, String] = indexesRename
-    ): TableMigration[T] = new TableMigration[T](tableNode) {
-      override def tableDrop: Boolean = tblDrop
-      override def tableCreate: Boolean = tblCreate
-      override def tableRename: Option[String] = tblRename
-      override def columnsCreate: Seq[ColumnInfo] = colCreate
-      override def columnsDrop: Seq[ColumnInfo] = colDrop
-      override def columnsRename: Map[ColumnInfo, String] = colRename
-      override def columnsAlterType: Seq[ColumnInfo] = colAlterType
-      override def columnsAlterDefault: Seq[ColumnInfo] = colAlterDefault
-      override def columnsAlterNullability: Seq[ColumnInfo] = colAlterNullability
-      override def foreignKeysCreate: Seq[ForeignKey[_ <: TableNode, _]] = frgnKeysCreate
-      override def foreignKeysDrop: Seq[ForeignKey[_ <: TableNode, _]] = frgnKeysDrop
-      override def primaryKeysCreate: Seq[(String, Seq[FieldSymbol])] = prmryKeysCreate
-      override def primaryKeysDrop: Seq[(String, Seq[FieldSymbol])] = prmryKeysDrop
-      override def indexesCreate: Seq[IndexInfo] = idxCreate
-      override def indexesDrop: Seq[IndexInfo] = idxDrop
-      override def indexesRename: Map[IndexInfo, String] = idxRename
-    }
+    protected[api] def data: TableMigrationData
+
+    protected def withData(data: TableMigrationData): Self
 
     private def colInfo(f: T => Column[_]): ColumnInfo = {
       val col = f(tableNode)
@@ -93,100 +65,172 @@ class TableMigrations[D <: JdbcDriver](driver: D)(implicit dialect: Dialect[D]) 
       }
     }
 
-    def create = copy(
-      tblCreate = true
-    )
+    def create = withData(data.copy(
+      tableCreate = true
+    ))
 
-    def drop = copy(
-      tblCreate = false,
-      tblDrop = true
-    )
-
-    def rename(to: String) = copy(
-      tblRename = Some(to)
-    )
-
-    def addColumns(cols: (T => Column[_])*) = copy(
-      colCreate = columnsCreate ++
-        cols.map(colInfo)
-    )
-
-    def dropColumns(cols: (T => Column[_])*) = copy(
-      colDrop = columnsDrop ++
-        cols.map(colInfo)
-    )
-
-    def renameColumn(col: T => Column[_], to: String) = copy(
-      colRename = columnsRename +
-        (colInfo(col) -> to)
-    )
-
-    def alterColumnTypes(cols: (T => Column[_])*) = copy(
-      colAlterType = columnsAlterType ++
-        cols.map(colInfo)
-    )
-
-    def alterColumnDefaults(cols: (T => Column[_])*) = copy(
-      colAlterDefault = columnsAlterDefault ++
-        cols.map(colInfo)
-    )
-
-    def alterColumnNulls(cols: (T => Column[_])*) = copy(
-      colAlterNullability = columnsAlterNullability ++
-        cols.map(colInfo)
-    )
-
-    def addPrimaryKeys(pks: (T => PrimaryKey)*) = copy(
-      prmryKeysCreate = primaryKeysCreate ++
-        pks.map { f =>
-          val key = f(tableNode)
-          (key.name, key.columns flatMap (fieldSym(_)))
-        }
-    )
-
-    def dropPrimaryKeys(pks: (T => PrimaryKey)*) = copy(
-      prmryKeysDrop = primaryKeysDrop ++
-        pks.map { f =>
-          val key = f(tableNode)
-          (key.name, key.columns flatMap (fieldSym(_)))
-        }
-    )
-
-    def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = copy(
-      frgnKeysCreate = foreignKeysCreate ++
-        fkqs.flatMap { f =>
-          val fkq = f(tableNode)
-          fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
-        }
-    )
-
-    def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = copy(
-      frgnKeysDrop = foreignKeysDrop ++
-        fkqs.flatMap { f =>
-          val fkq = f(tableNode)
-          fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
-        }
+    def drop = new IrreversibleTableMigration(
+      tableNode,
+      table,
+      data.copy(
+        tableCreate = false,
+        tableDrop = true
       )
+    )
 
-    def addIndexes(indexes: (T => Index)*) = copy(
-      idxCreate = indexesCreate ++
+    def rename(to: String) = withData(data.copy(
+      tableRename = Some(to)
+    ))
+
+    def addColumns(cols: (T => Column[_])*) = withData(data.copy(
+      columnsCreate = data.columnsCreate ++
+        cols.map(colInfo)
+    ))
+
+    def dropColumns(cols: (T => Column[_])*) = withData(data.copy(
+      columnsDrop = data.columnsDrop ++
+        cols.map(colInfo)
+    ))
+
+    def renameColumn(col: T => Column[_], to: String) = withData(data.copy(
+      columnsRename = data.columnsRename +
+        (colInfo(col) -> to)
+    ))
+
+    def alterColumnTypes(cols: (T => Column[_])*) = new IrreversibleTableMigration(
+      tableNode,
+      table,
+      data.copy(
+        columnsAlterType = data.columnsAlterType ++
+          cols.map(colInfo)
+      )
+    )
+
+    def alterColumnDefaults(cols: (T => Column[_])*) = new IrreversibleTableMigration(
+      tableNode,
+      table,
+      data.copy(
+        columnsAlterDefault = data.columnsAlterDefault ++
+          cols.map(colInfo)
+      )
+    )
+
+    def alterColumnNulls(cols: (T => Column[_])*) = new IrreversibleTableMigration(
+      tableNode,
+      table,
+      data.copy(
+        columnsAlterNullability = data.columnsAlterNullability ++
+          cols.map(colInfo)
+      )
+    )
+
+    def addPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
+      primaryKeysCreate = data.primaryKeysCreate ++
+        pks.map { f =>
+          val key = f(tableNode)
+          (key.name, key.columns flatMap (fieldSym(_)))
+        }
+    ))
+
+    def dropPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
+      primaryKeysDrop = data.primaryKeysDrop ++
+        pks.map { f =>
+          val key = f(tableNode)
+          (key.name, key.columns flatMap (fieldSym(_)))
+        }
+    ))
+
+    def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
+      foreignKeysCreate = data.foreignKeysCreate ++
+        fkqs.flatMap { f =>
+          val fkq = f(tableNode)
+          fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
+        }
+    ))
+
+    def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
+      foreignKeysDrop = data.foreignKeysDrop ++
+        fkqs.flatMap { f =>
+          val fkq = f(tableNode)
+          fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
+        }
+    ))
+
+    def addIndexes(indexes: (T => Index)*) = withData(data.copy(
+      indexesCreate = data.indexesCreate ++
         indexes.map { f =>
           val i = f(tableNode)
           indexInfo(i)
         }
-    )
+    ))
 
-    def dropIndexes(indexes: (T => Index)*) = copy(
-      idxDrop = indexesDrop ++
+    def dropIndexes(indexes: (T => Index)*) = withData(data.copy(
+      indexesDrop = data.indexesDrop ++
         indexes.map { f =>
           val i = f(tableNode)
           indexInfo(i)
         }
-    )
+    ))
 
-    def renameIndex(index: (T => Index), to: String) = copy(
-      idxRename = indexesRename +
+    def renameIndex(index: (T => Index), to: String) = withData(data.copy(
+      indexesRename = data.indexesRename +
         (indexInfo(index(tableNode)) -> to)
-    )
+    ))
+
+    def canEqual(that: Any) = that.isInstanceOf[TableMigration[_]]
+
+    override def equals(a: Any) = a match {
+      case that: TableMigration[_] if that canEqual this =>
+        (that.table, that.data) == (this.table, this.data)
+      case _ => false
+    }
+  }
+
+  final class IrreversibleTableMigration[T <: TableNode] private[TableMigrations](tableNode: T, override val table: TableInfo, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) {
+    type Self = IrreversibleTableMigration[T]
+    protected def withData(d: TableMigrationData) = new IrreversibleTableMigration(tableNode, table, d)
+  }
+
+  final class ReversibleTableMigration[T <: TableNode] private[TableMigrations](tableNode: T, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) with ReversibleMigration { outer =>
+
+    require(data.tableDrop == false)
+    require(data.columnsAlterType.isEmpty)
+    require(data.columnsAlterDefault.isEmpty)
+    require(data.columnsAlterNullability.isEmpty)
+
+    type Self = ReversibleTableMigration[T]
+    protected def withData(d: TableMigrationData) = new ReversibleTableMigration(tableNode, d)
+
+    def reverse = {
+      new IrreversibleTableMigration(
+        tableNode,
+        outer.data.tableRename match {
+          case Some(name) => outer.table.copy(tableName = name)
+          case None       => outer.table
+        },
+        data.copy(
+          tableDrop               = data.tableCreate,
+          tableCreate             = false,
+          tableRename             = data.tableRename.map(_ => table.tableName),
+          columnsCreate           = data.columnsDrop.reverse,
+          columnsDrop             = data.columnsCreate.reverse,
+          columnsRename           = data.columnsRename.map {
+            case (ci, s) => (ci.copy(name = s), ci.name)
+          },
+          columnsAlterType        = Nil,
+          columnsAlterDefault     = Nil,
+          columnsAlterNullability = Nil,
+          foreignKeysCreate       = data.foreignKeysDrop.reverse,
+          foreignKeysDrop         = data.foreignKeysCreate.reverse,
+          primaryKeysCreate       = data.primaryKeysDrop.reverse,
+          primaryKeysDrop         = data.primaryKeysCreate.reverse,
+          indexesCreate           = data.indexesDrop.reverse,
+          indexesDrop             = data.indexesCreate.reverse,
+          indexesRename           = data.indexesRename.map {
+            case (ii, s) => (ii.copy(name = s), ii.name)
+          }
+        )
+      )
+    }
   }
 }

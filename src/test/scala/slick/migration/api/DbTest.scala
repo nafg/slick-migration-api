@@ -74,21 +74,20 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
           cols.find(_.column == "col1").flatMap(_.columnDef).foreach(_ should equal (columnDefaultFormat("abc")))
       }
 
-      //TODO createTable.reverse should equal (DropTable(table1))
+      tm.create.reverse should equal (tm.drop)
 
-    } finally {
-      //TODO createTable.reverse()
+    } finally
       tm.drop.apply()
-    }
 
     getTables should equal (before)
   }
 
   test("addColumns") {
-    object table5 extends Table[(Long, String)]("table5") {
+    object table5 extends Table[(Long, String, Option[Int])]("table5") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2", O.Default(""))
-      def * = col1 ~ col2
+      def col3 = column[Option[Int]]("col3")
+      def * = col1 ~ col2 ~ col3
     }
 
     val tm = TableMigration(table5)
@@ -96,17 +95,17 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
 
     def columnsCount = getTable("table5").map(_.getColumns.list.length)
 
-    columnsCount should equal (Some(1))
+    try {
+      columnsCount should equal (Some(1))
 
-    val addColumn = tm.addColumns(_.col2)
-    addColumn()
+      val addColumn = tm.addColumns(_.col2, _.col3)
+      addColumn.reverse should equal (tm.dropColumns(_.col3, _.col2))
 
-    // note this doesn't actually compare the second argument
-    //TODO addColumn.reverse should equal (DropColumn(table5)(_.col2))
+      addColumn()
 
-    columnsCount should equal (Some(2))
-
-    tm.drop.apply()
+      columnsCount should equal (Some(3))
+    } finally
+      tm.drop.apply()
   }
 
   test("addIndexes, dropIndexes") {
@@ -140,10 +139,9 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
       indexes(Some("index1") -> false) should equal (List((1, Some("col1"))))
       indexes(Some("index2") -> true) should equal (List((1, Some("col2")), (2, Some("col3"))))
 
-      //TODO createIndexes.reverse should equal (DropIndex(table4.index2) & DropIndex(table4.index1))
+      createIndexes.reverse should equal (tm.dropIndexes(_.index2, _.index1))
 
-      //TODO createIndexes.reverse()
-      tm.dropIndexes(_.index1, _.index2)()
+      createIndexes.reverse.apply()
 
       indexes.keys.flatMap(_._1).exists(Set("index1", "index2") contains _) should equal (false)
     } finally
@@ -177,6 +175,8 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
       indexes should equal (List("index1"))
     } finally
       tm7.drop.apply()
+
+    tm.rename("table7").reverse should equal (tm7.rename("oldname"))
   }
 }
 
@@ -212,10 +212,8 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
 
       pks(Some("PRIMARY")) should equal (List(1 -> "id", 2 -> "stringId"))
 
-      //TODO
-      // createPrimaryKey.reverse should equal (DropPrimaryKey(table8)(_.pk))
-      //TODO
-      // createPrimaryKey.reverse()
+      tm.addPrimaryKeys(_.pk).reverse should equal (tm.dropPrimaryKeys(_.pk))
+
       tm.dropPrimaryKeys(_.pk)()
 
       pks should equal (before)
@@ -228,7 +226,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
       def other = column[Long]("other")
 
       def * = id ~ other
-      // not a def, so equality works
+      // not a def, so that equality works
       lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.NoAction, ForeignKeyAction.Cascade)
     }
     object table3 extends Table[Long]("table3") {
@@ -266,13 +264,10 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
         ("table3", ("table3", "id", "table2", "other", noActionReturns, ForeignKeyAction.Cascade, Some("fk_other")) :: Nil)
       ))
 
-      val dropForeignKey = // TODO createForeignKey.reverse
-        tm2.dropForeignKeys(_.fk)
-      //TODO
-      // inside(dropForeignKey.migrations.toList) {
-      //   case DropForeignKey(fk) :: Nil =>
-      //     Seq(fk) should equal (table2.fk.fks)
-      // }
+      val dropForeignKey = createForeignKey.reverse
+
+      dropForeignKey.data.foreignKeysDrop.toList should equal (table2.fk.fks.toList)
+      dropForeignKey should equal (tm2.dropForeignKeys(_.fk))
 
       dropForeignKey()
 
@@ -303,6 +298,8 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
       columnsCount should equal (Some(1))
     } finally
       tm.drop.apply()
+
+    tm.addColumns(_.col1, _.col2).reverse should equal (tm.dropColumns(_.col2, _.col1))
   }
 
   test("alterColumnTypes") {
@@ -387,5 +384,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
       columns should equal (List("col1"))
     } finally
       tm.drop.apply()
+
+    tm.renameColumn(_.col1, "col1").reverse should equal (tm.renameColumn(_.column[Long]("col1"), "oldname"))
   }
 }

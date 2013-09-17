@@ -141,33 +141,33 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
    *  - if create, incorporate as much as possible into the create statement, including any rename
    *  - if !create, do rename + other alters
    */
-  def migrateTable[E <: D](tm: TableMigrations[E]#TableMigration[_]): Seq[String] = {
+  def migrateTable[E <: D](table: TableInfo, tmd: TableMigrationData): Seq[String] = {
     val drop =
-      if(!tm.tableDrop) Nil
-      else Seq(dropTable(tm.table))
+      if(!tmd.tableDrop) Nil
+      else Seq(dropTable(table))
 
-    val createColumns = if(tm.tableCreate) {
-      val tbl = tm.tableRename match {
-        case Some(name) => tm.table.copy(tableName = name)
-        case None       => tm.table
+    val createColumns = if(tmd.tableCreate) {
+      val tbl = tmd.tableRename match {
+        case Some(name) => table.copy(tableName = name)
+        case None       => table
       }
-      Seq(createTable(tbl, tm.columnsCreate))
+      Seq(createTable(tbl, tmd.columnsCreate))
     } else
-      tm.tableRename.map{ renameTable(tm.table, _) }.toList ++
-      tm.columnsCreate.map{ addColumn(tm.table, _) }
+      tmd.tableRename.map{ renameTable(table, _) }.toList ++
+      tmd.columnsCreate.map{ addColumn(table, _) }
     val modifyColumns =
-      tm.columnsDrop.map{ c => dropColumn(tm.table, c.name) } ++
-      tm.columnsRename.map{ case (k, v) => renameColumn(tm.table, k, v) } ++
-      tm.columnsAlterType.flatMap{ alterColumnType(tm.table, _) } ++
-      tm.columnsAlterDefault.map{ alterColumnDefault(tm.table, _) } ++
-      tm.columnsAlterNullability.map{ alterColumnNullability(tm.table, _) }
+      tmd.columnsDrop.map{ c => dropColumn(table, c.name) } ++
+      tmd.columnsRename.map{ case (k, v) => renameColumn(table, k, v) } ++
+      tmd.columnsAlterType.flatMap{ alterColumnType(table, _) } ++
+      tmd.columnsAlterDefault.map{ alterColumnDefault(table, _) } ++
+      tmd.columnsAlterNullability.map{ alterColumnNullability(table, _) }
     val migrateIndexes =
-      tm.primaryKeysDrop.map{ pk => dropPrimaryKey(tm.table, pk._1) } ++
-      tm.primaryKeysCreate.map{ case (name, cols) => createPrimaryKey(tm.table, name, cols) } ++
-      tm.foreignKeysDrop.map{ fk => dropForeignKey(tm.table, fk.name) } ++
-      tm.foreignKeysCreate.map{ fk =>
+      tmd.primaryKeysDrop.map{ pk => dropPrimaryKey(table, pk._1) } ++
+      tmd.primaryKeysCreate.map{ case (name, cols) => createPrimaryKey(table, name, cols) } ++
+      tmd.foreignKeysDrop.map{ fk => dropForeignKey(table, fk.name) } ++
+      tmd.foreignKeysCreate.map{ fk =>
         createForeignKey(
-          tm.table,
+          table,
           fk.name,
           fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq),
           tableInfo(fk.targetTable),
@@ -176,9 +176,9 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
           fk.onDelete
         )
       } ++
-      tm.indexesDrop.map{ dropIndex } ++
-      tm.indexesCreate.map{ createIndex } ++
-      tm.indexesRename.flatMap{ case (k, v) => renameIndex(k, v) }
+      tmd.indexesDrop.map{ dropIndex } ++
+      tmd.indexesCreate.map{ createIndex } ++
+      tmd.indexesRename.flatMap{ case (k, v) => renameIndex(k, v) }
 
     drop ++
       createColumns ++
