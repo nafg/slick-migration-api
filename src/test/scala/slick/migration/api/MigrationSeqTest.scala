@@ -7,8 +7,6 @@ import scala.slick.driver.H2Driver
 
 class MigrationSeqTest extends FunSuite with ShouldMatchers {
   test("& returns the right type and doesn't keep nesting") {
-    object migrations extends Migrations(H2Driver)
-    import migrations._
     val m = new Migration {
       def apply()(implicit s: H2Driver.simple.Session) = ()
     }

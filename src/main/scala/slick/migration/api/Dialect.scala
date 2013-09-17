@@ -141,7 +141,7 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
    *  - if create, incorporate as much as possible into the create statement, including any rename
    *  - if !create, do rename + other alters
    */
-  def migrateTable(tm: TableMigrationBase): Seq[String] = {
+  def migrateTable[E <: D](tm: TableMigrations[E]#TableMigration[_]): Seq[String] = {
     val drop =
       if(!tm.tableDrop) Nil
       else Seq(dropTable(tm.table))
