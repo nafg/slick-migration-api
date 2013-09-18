@@ -86,7 +86,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
   /**
    * The concrete type of this `TableMigration` ([[ReversibleTableMigration]] or [[IrreversibleTableMigration]]).* Operations that are in of themselves reversible will return an instance of this type.
    */
-  protected type Self <: TableMigration[T]
+  type Self <: TableMigration[T]
 
   def tableInfo = TableInfo(table.schemaName, table.tableName)
 
