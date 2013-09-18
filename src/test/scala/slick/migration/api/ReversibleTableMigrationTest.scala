@@ -4,8 +4,7 @@ package migration.api
 import scala.slick.driver.H2Driver
 
 object ReversibleTableMigrationCompileTimeTest {
-  object tms extends TableMigrations[H2Driver]
-  import tms._
+  implicit val dialect = new H2Dialect
 
   import H2Driver.simple._
 
@@ -15,8 +14,8 @@ object ReversibleTableMigrationCompileTimeTest {
     def * = col1 ~ col2
   }
 
-  type Rev = ReversibleTableMigration[table1.type]
-  type Irr = IrreversibleTableMigration[table1.type]
+  type Rev = TableMigrationImpl.ReversibleTableMigration[table1.type]
+  type Irr = TableMigrationImpl.IrreversibleTableMigration[table1.type]
 
   // An empty TableMigration is reversible
   val tm = TableMigration(table1)

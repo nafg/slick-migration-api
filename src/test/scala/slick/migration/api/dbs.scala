@@ -13,6 +13,16 @@ import com.typesafe.slick.testkit.util.JdbcTestDB
 import com.typesafe.slick.testkit.util.ExternalJdbcTestDB
 import com.typesafe.slick.testkit.util.TestDB
 
+object Dialects {
+  implicit def derby   : Dialect[DerbyDriver   ] = new DerbyDialect
+  implicit def h2      : Dialect[H2Driver      ] = new H2Dialect
+  implicit def sqlite  : Dialect[SQLiteDriver  ] = new SQLiteDialect
+  implicit def hsqldb  : Dialect[HsqldbDriver  ] = new HsqldbDialect
+  implicit def mysql   : Dialect[MySQLDriver   ] = new MySQLDialect
+  implicit def postgres: Dialect[PostgresDriver] = new PostgresDialect
+}
+import Dialects._
+
 class H2Test extends DbTest[H2Driver](new JdbcTestDB("h2mem") {
   type Driver = H2Driver.type
   val driver = H2Driver

@@ -5,7 +5,7 @@ import scala.slick.driver.JdbcDriver
 import scala.slick.ast.{ FieldSymbol, Node, TableNode }
 import scala.slick.lifted.{ Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey }
 
-case class TableMigrationData(
+private[api] case class TableMigrationData(
   // not reversible: insufficient info: don't know entire old table
   tableDrop: Boolean = false,
   // reverse: create=false, drop=true
@@ -40,161 +40,162 @@ case class TableMigrationData(
   indexesRename: Map[IndexInfo, String] = Map.empty
 )
 
-class TableMigrations[D <: JdbcDriver](implicit dialect: Dialect[D]) {
-  object TableMigration {
-    def apply[T <: JdbcDriver#Table[_]](tableNode: T) = new ReversibleTableMigration(tableNode, TableMigrationData())
+object TableMigration {
+  def apply[T <: JdbcDriver#Table[_]](tableNode: T)(implicit dialect: Dialect[_]) = new TableMigrationImpl.ReversibleTableMigration(tableNode, TableMigrationData())
+}
+
+sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](tableNode: T)(implicit dialect: Dialect[_])
+  extends SqlMigration with AstHelpers with Equals { outer =>
+  type Self <: TableMigration[T]
+
+  def sql = dialect.migrateTable(table, data)
+
+  def table = TableInfo(tableNode.schemaName, tableNode.tableName)
+
+  protected[api] def data: TableMigrationData
+
+  protected def withData(data: TableMigrationData): Self
+
+  private def colInfo(f: T => Column[_]): ColumnInfo = {
+    val col = f(tableNode)
+    fieldSym(Node(col)) match {
+      case Some(c) =>
+        tableNode.tableProvider match {
+          case driver: JdbcDriver => columnInfo(driver, c)
+          case _                  => sys.error("Invalid table: " + tableNode)
+        }
+      case None    => sys.error("Invalid column: " + col)
+    }
   }
-  sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](tableNode: T)
-    extends SqlMigration with AstHelpers with Equals { outer =>
-    type Self <: TableMigration[T]
 
-    def sql = dialect.migrateTable(table, data)
+  def create = withData(data.copy(
+    tableCreate = true
+  ))
 
-    def table = TableInfo(tableNode.schemaName, tableNode.tableName)
+  def drop = new TableMigrationImpl.IrreversibleTableMigration(
+    tableNode,
+    table,
+    data.copy(
+      tableCreate = false,
+      tableDrop = true
+    )
+  )
 
-    protected[api] def data: TableMigrationData
+  def rename(to: String) = withData(data.copy(
+    tableRename = Some(to)
+  ))
 
-    protected def withData(data: TableMigrationData): Self
+  def addColumns(cols: (T => Column[_])*) = withData(data.copy(
+    columnsCreate = data.columnsCreate ++
+      cols.map(colInfo)
+  ))
 
-    private def colInfo(f: T => Column[_]): ColumnInfo = {
-      val col = f(tableNode)
-      fieldSym(Node(col)) match {
-        case Some(c) =>
-          tableNode.tableProvider match {
-            case driver: JdbcDriver => columnInfo(driver, c)
-            case _                  => sys.error("Invalid table: " + tableNode)
-          }
-        case None    => sys.error("Invalid column: " + col)
+  def dropColumns(cols: (T => Column[_])*) = withData(data.copy(
+    columnsDrop = data.columnsDrop ++
+      cols.map(colInfo)
+  ))
+
+  def renameColumn(col: T => Column[_], to: String) = withData(data.copy(
+    columnsRename = data.columnsRename +
+      (colInfo(col) -> to)
+  ))
+
+  def alterColumnTypes(cols: (T => Column[_])*) = new TableMigrationImpl.IrreversibleTableMigration(
+    tableNode,
+    table,
+    data.copy(
+      columnsAlterType = data.columnsAlterType ++
+        cols.map(colInfo)
+    )
+  )
+
+  def alterColumnDefaults(cols: (T => Column[_])*) = new TableMigrationImpl.IrreversibleTableMigration(
+    tableNode,
+    table,
+    data.copy(
+      columnsAlterDefault = data.columnsAlterDefault ++
+        cols.map(colInfo)
+    )
+  )
+
+  def alterColumnNulls(cols: (T => Column[_])*) = new TableMigrationImpl.IrreversibleTableMigration(
+    tableNode,
+    table,
+    data.copy(
+      columnsAlterNullability = data.columnsAlterNullability ++
+        cols.map(colInfo)
+    )
+  )
+
+  def addPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
+    primaryKeysCreate = data.primaryKeysCreate ++
+      pks.map { f =>
+        val key = f(tableNode)
+        (key.name, key.columns flatMap (fieldSym(_)))
       }
-    }
+  ))
 
-    def create = withData(data.copy(
-      tableCreate = true
-    ))
+  def dropPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
+    primaryKeysDrop = data.primaryKeysDrop ++
+      pks.map { f =>
+        val key = f(tableNode)
+        (key.name, key.columns flatMap (fieldSym(_)))
+      }
+  ))
 
-    def drop = new IrreversibleTableMigration(
-      tableNode,
-      table,
-      data.copy(
-        tableCreate = false,
-        tableDrop = true
-      )
-    )
+  def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
+    foreignKeysCreate = data.foreignKeysCreate ++
+      fkqs.flatMap { f =>
+        val fkq = f(tableNode)
+        fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
+      }
+  ))
 
-    def rename(to: String) = withData(data.copy(
-      tableRename = Some(to)
-    ))
+  def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
+    foreignKeysDrop = data.foreignKeysDrop ++
+      fkqs.flatMap { f =>
+        val fkq = f(tableNode)
+        fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
+      }
+  ))
 
-    def addColumns(cols: (T => Column[_])*) = withData(data.copy(
-      columnsCreate = data.columnsCreate ++
-        cols.map(colInfo)
-    ))
+  def addIndexes(indexes: (T => Index)*) = withData(data.copy(
+    indexesCreate = data.indexesCreate ++
+      indexes.map { f =>
+        val i = f(tableNode)
+        indexInfo(i)
+      }
+  ))
 
-    def dropColumns(cols: (T => Column[_])*) = withData(data.copy(
-      columnsDrop = data.columnsDrop ++
-        cols.map(colInfo)
-    ))
+  def dropIndexes(indexes: (T => Index)*) = withData(data.copy(
+    indexesDrop = data.indexesDrop ++
+      indexes.map { f =>
+        val i = f(tableNode)
+        indexInfo(i)
+      }
+  ))
 
-    def renameColumn(col: T => Column[_], to: String) = withData(data.copy(
-      columnsRename = data.columnsRename +
-        (colInfo(col) -> to)
-    ))
+  def renameIndex(index: (T => Index), to: String) = withData(data.copy(
+    indexesRename = data.indexesRename +
+      (indexInfo(index(tableNode)) -> to)
+  ))
 
-    def alterColumnTypes(cols: (T => Column[_])*) = new IrreversibleTableMigration(
-      tableNode,
-      table,
-      data.copy(
-        columnsAlterType = data.columnsAlterType ++
-          cols.map(colInfo)
-      )
-    )
+  def canEqual(that: Any) = that.isInstanceOf[TableMigration[_]]
 
-    def alterColumnDefaults(cols: (T => Column[_])*) = new IrreversibleTableMigration(
-      tableNode,
-      table,
-      data.copy(
-        columnsAlterDefault = data.columnsAlterDefault ++
-          cols.map(colInfo)
-      )
-    )
-
-    def alterColumnNulls(cols: (T => Column[_])*) = new IrreversibleTableMigration(
-      tableNode,
-      table,
-      data.copy(
-        columnsAlterNullability = data.columnsAlterNullability ++
-          cols.map(colInfo)
-      )
-    )
-
-    def addPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
-      primaryKeysCreate = data.primaryKeysCreate ++
-        pks.map { f =>
-          val key = f(tableNode)
-          (key.name, key.columns flatMap (fieldSym(_)))
-        }
-    ))
-
-    def dropPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
-      primaryKeysDrop = data.primaryKeysDrop ++
-        pks.map { f =>
-          val key = f(tableNode)
-          (key.name, key.columns flatMap (fieldSym(_)))
-        }
-    ))
-
-    def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
-      foreignKeysCreate = data.foreignKeysCreate ++
-        fkqs.flatMap { f =>
-          val fkq = f(tableNode)
-          fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
-        }
-    ))
-
-    def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
-      foreignKeysDrop = data.foreignKeysDrop ++
-        fkqs.flatMap { f =>
-          val fkq = f(tableNode)
-          fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
-        }
-    ))
-
-    def addIndexes(indexes: (T => Index)*) = withData(data.copy(
-      indexesCreate = data.indexesCreate ++
-        indexes.map { f =>
-          val i = f(tableNode)
-          indexInfo(i)
-        }
-    ))
-
-    def dropIndexes(indexes: (T => Index)*) = withData(data.copy(
-      indexesDrop = data.indexesDrop ++
-        indexes.map { f =>
-          val i = f(tableNode)
-          indexInfo(i)
-        }
-    ))
-
-    def renameIndex(index: (T => Index), to: String) = withData(data.copy(
-      indexesRename = data.indexesRename +
-        (indexInfo(index(tableNode)) -> to)
-    ))
-
-    def canEqual(that: Any) = that.isInstanceOf[TableMigration[_]]
-
-    override def equals(a: Any) = a match {
-      case that: TableMigration[_] if that canEqual this =>
-        (that.table, that.data) == (this.table, this.data)
-      case _ => false
-    }
+  override def equals(a: Any) = a match {
+    case that: TableMigration[_] if that canEqual this =>
+      (that.table, that.data) == (this.table, this.data)
+    case _ => false
   }
+}
 
-  final class IrreversibleTableMigration[T <: JdbcDriver#Table[_]] private[TableMigrations](tableNode: T, override val table: TableInfo, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) {
+private[api] object TableMigrationImpl {
+  final class IrreversibleTableMigration[T <: JdbcDriver#Table[_]](tableNode: T, override val table: TableInfo, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_]) extends TableMigration[T](tableNode) {
     type Self = IrreversibleTableMigration[T]
     protected def withData(d: TableMigrationData) = new IrreversibleTableMigration(tableNode, table, d)
   }
 
-  final class ReversibleTableMigration[T <: JdbcDriver#Table[_]] private[TableMigrations](tableNode: T, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) with ReversibleMigration { outer =>
+  final class ReversibleTableMigration[T <: JdbcDriver#Table[_]](tableNode: T, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_]) extends TableMigration[T](tableNode) with ReversibleMigration { outer =>
 
     require(data.tableDrop == false)
     require(data.columnsAlterType.isEmpty)

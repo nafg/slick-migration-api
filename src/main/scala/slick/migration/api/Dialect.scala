@@ -5,16 +5,6 @@ import driver._
 import ast.{ FieldSymbol, TableNode }
 import lifted.ForeignKeyAction
 
-object Dialect {
-  implicit def default[D <: JdbcDriver]: Dialect[D] = new Dialect[D]
-  implicit lazy val derby   : Dialect[DerbyDriver   ] = new DerbyDialect
-  implicit lazy val h2      : Dialect[H2Driver      ] = new H2Dialect
-  implicit lazy val sqlite  : Dialect[SQLiteDriver  ] = new SQLiteDialect
-  implicit lazy val hsqldb  : Dialect[HsqldbDriver  ] = new HsqldbDialect
-  implicit lazy val mysql   : Dialect[MySQLDriver   ] = new MySQLDialect
-  implicit lazy val postgres: Dialect[PostgresDriver] = new PostgresDialect
-}
-
 class Dialect[-D <: JdbcDriver] extends AstHelpers {
   def quoteIdentifier(id: String): String = {
     val s = new StringBuilder(id.length + 4) append '"'

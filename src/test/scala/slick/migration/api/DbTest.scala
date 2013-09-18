@@ -18,9 +18,6 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
 
   lazy val driver: Drv = tdb.driver
 
-  object migrations extends TableMigrations[Drv]
-  import migrations.TableMigration
-
   import driver.simple._
 
   override def beforeAll() = tdb.cleanUpBefore()
@@ -181,8 +178,6 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
 }
 
 abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type Driver <: Drv }) extends BasicDbTest[Drv](tdb) {
-
-  import migrations._
   import driver.simple._
 
   test("addPrimaryKeys, dropPrimaryKeys") {
