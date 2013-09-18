@@ -4,7 +4,7 @@ package migration.api
 import scala.slick.driver.H2Driver
 
 object ReversibleTableMigrationCompileTimeTest {
-  object tms extends TableMigrations(H2Driver)
+  object tms extends TableMigrations[H2Driver]
   import tms._
 
   import H2Driver.simple._

@@ -40,12 +40,11 @@ case class TableMigrationData(
   indexesRename: Map[IndexInfo, String] = Map.empty
 )
 
-class TableMigrations[D <: JdbcDriver](driver: D)(implicit dialect: Dialect[D]) {
-
+class TableMigrations[D <: JdbcDriver](implicit dialect: Dialect[D]) {
   object TableMigration {
-    def apply[T <: TableNode](tableNode: T) = new ReversibleTableMigration(tableNode, TableMigrationData())
+    def apply[T <: JdbcDriver#Table[_]](tableNode: T) = new ReversibleTableMigration(tableNode, TableMigrationData())
   }
-  sealed abstract class TableMigration[T <: TableNode](tableNode: T)
+  sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](tableNode: T)
     extends SqlMigration with AstHelpers with Equals { outer =>
     type Self <: TableMigration[T]
 
@@ -60,7 +59,11 @@ class TableMigrations[D <: JdbcDriver](driver: D)(implicit dialect: Dialect[D]) 
     private def colInfo(f: T => Column[_]): ColumnInfo = {
       val col = f(tableNode)
       fieldSym(Node(col)) match {
-        case Some(c) => columnInfo(driver, c)
+        case Some(c) =>
+          tableNode.tableProvider match {
+            case driver: JdbcDriver => columnInfo(driver, c)
+            case _                  => sys.error("Invalid table: " + tableNode)
+          }
         case None    => sys.error("Invalid column: " + col)
       }
     }
@@ -186,12 +189,12 @@ class TableMigrations[D <: JdbcDriver](driver: D)(implicit dialect: Dialect[D]) 
     }
   }
 
-  final class IrreversibleTableMigration[T <: TableNode] private[TableMigrations](tableNode: T, override val table: TableInfo, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) {
+  final class IrreversibleTableMigration[T <: JdbcDriver#Table[_]] private[TableMigrations](tableNode: T, override val table: TableInfo, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) {
     type Self = IrreversibleTableMigration[T]
     protected def withData(d: TableMigrationData) = new IrreversibleTableMigration(tableNode, table, d)
   }
 
-  final class ReversibleTableMigration[T <: TableNode] private[TableMigrations](tableNode: T, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) with ReversibleMigration { outer =>
+  final class ReversibleTableMigration[T <: JdbcDriver#Table[_]] private[TableMigrations](tableNode: T, protected[api] val data: TableMigrationData) extends TableMigration[T](tableNode) with ReversibleMigration { outer =>
 
     require(data.tableDrop == false)
     require(data.columnsAlterType.isEmpty)

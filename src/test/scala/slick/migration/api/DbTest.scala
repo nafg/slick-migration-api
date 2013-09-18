@@ -18,7 +18,7 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
 
   lazy val driver: Drv = tdb.driver
 
-  object migrations extends TableMigrations[Drv](driver)
+  object migrations extends TableMigrations[Drv]
   import migrations.TableMigration
 
   import driver.simple._
