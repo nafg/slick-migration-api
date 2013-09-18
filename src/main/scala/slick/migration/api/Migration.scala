@@ -61,10 +61,10 @@ trait SqlMigration extends Migration {
 case class MigrationException(message: String, cause: Throwable) extends RuntimeException(message, cause)
 
 object SqlMigration {
-  def apply(sql: String) = {
+  def apply(sql: String*) = {
     def sql0 = sql
     new SqlMigration {
-      def sql = Seq(sql0)
+      def sql = sql0
     }
   }
 }
