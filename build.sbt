@@ -21,3 +21,5 @@ libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.2.8" 
 libraryDependencies += "postgresql"          % "postgresql"           % "9.1-901.jdbc4" % "test"
 
 libraryDependencies += "mysql"               % "mysql-connector-java" % "5.1.23"        % "test"
+
+scalacOptions in (Compile, doc) ++= Seq("-groups", "-implicits")

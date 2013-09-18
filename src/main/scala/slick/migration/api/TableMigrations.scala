@@ -5,6 +5,9 @@ import scala.slick.driver.JdbcDriver
 import scala.slick.ast.{ FieldSymbol, Node, TableNode }
 import scala.slick.lifted.{ Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey }
 
+/**
+ * Internal data stucture that stores schema manipulation operations to be perfomed on a table
+ */
 protected[api] case class TableMigrationData(
   // not reversible: insufficient info: don't know entire old table
   tableDrop: Boolean = false,
@@ -44,11 +47,45 @@ protected[api] case class TableMigrationData(
  * Factory for [[TableMigration]]s
  */
 object TableMigration {
+  /**
+   * Creates a [[TableMigration]] that will perform migrations on `table`
+   */
   def apply[T <: JdbcDriver#Table[_]](table: T)(implicit dialect: Dialect[_]) = new ReversibleTableMigration(table, TableMigrationData())
 }
 
+/**
+ * The base class for table migrations.
+ * A table migration is a [[Migration]] that performs changes to a table.
+ *
+ * See this class's methods for a list of available operations. Calling an operation method
+ * returns a new `TableMigration` that has that operation added, over operations
+ * contained in the original `TableMigration`. This allows for a nice method chaining syntax.
+ *
+ * Like all [[Migration]]s, you can run the resulting [[TableMigration]] by calling its
+ * `apply` method (it expects an implicit `Session`). Being an [[SqlMigration]] you
+ * can also call the `sql` method to see the SQL statement(s) it uses.
+ *
+ * This class is abstract; use its companion object as a factory to get an instance.
+ *
+ * @example {{{
+ *   object table1 extends Table[(Int, Int, Int)]("table1") {
+ *     def col1 = column[Int]("col1")
+ *     def col2 = column[Int]("col2")
+ *     def col3 = column[Int]("col3")
+ *     def * = col1 ~ col2 ~ col3
+ *   }
+ *   implicit val dialect = new H2Dialect
+ *   val migration = TableMigration(table1)
+ *                     .addColumns(_.col1, _.col2)
+ *                     .addColumns(_.col3)
+ * }}}
+ * @groupname oper Schema Manipulation Operations
+ */
 sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implicit dialect: Dialect[_])
   extends SqlMigration with AstHelpers with Equals { outer =>
+  /**
+   * The concrete type of this `TableMigration` ([[ReversibleTableMigration]] or [[IrreversibleTableMigration]]).* Operations that are in of themselves reversible will return an instance of this type.
+   */
   protected type Self <: TableMigration[T]
 
   def tableInfo = TableInfo(table.schemaName, table.tableName)
@@ -71,10 +108,20 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     }
   }
 
+  /**
+   * Create the table.
+   * Note: drop + create is allowed.
+   * @group oper
+   */
   def create = withData(data.copy(
     tableCreate = true
   ))
 
+  /**
+   * Drop the table.
+   * Note: drop + create is allowed.
+   * @group oper
+   */
   def drop = new IrreversibleTableMigration(
     table,
     tableInfo,
@@ -84,25 +131,55 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     )
   )
 
+  /**
+   * Rename the table
+   * @param to the new name for the table
+   * @group oper
+   */
   def rename(to: String) = withData(data.copy(
     tableRename = Some(to)
   ))
 
+  /**
+   * Add columns to the table.
+   * (If the table is being created, these may be incorporated into the `CREATE TABLE` statement.)
+   * @param cols zero or more column-returning functions, which are passed the table object.
+   * @example {{{ tblMig.addColumns(_.col1, _.col2, _.column[Int]("fieldNotYetInTableDef")) }}}
+   * @group oper
+   */
   def addColumns(cols: (T => Column[_])*) = withData(data.copy(
     columnsCreate = data.columnsCreate ++
       cols.map(colInfo)
   ))
 
+  /**
+   * Drop columns.
+   * @param cols zero or more column-returning functions, which are passed the table object.
+   * @example {{{ tblMig.dropColumns(_.col1, _.col2, _.column[Int]("oldFieldNotInTableDef")) }}}
+   * @group oper
+   */
   def dropColumns(cols: (T => Column[_])*) = withData(data.copy(
     columnsDrop = data.columnsDrop ++
       cols.map(colInfo)
   ))
 
+  /**
+   * Rename a column.
+   * @param col a column-returning function, which is passed the table object.
+   * @example {{{ tblMig.renameColumns(_.col1, "newName") }}}
+   * @group oper
+   */
   def renameColumn(col: T => Column[_], to: String) = withData(data.copy(
     columnsRename = data.columnsRename +
       (colInfo(col) -> to)
   ))
 
+  /**
+   * Changes the data type of columns based on the column definitions in `cols`
+   * @param cols zero or more column-returning functions, which are passed the table object.
+   * @example {{{ tblMig.alterColumnTypes(_.col1, _.column[NotTheTypeInTableDef]("col2")) }}}
+   * @group oper
+   */
   def alterColumnTypes(cols: (T => Column[_])*) = new IrreversibleTableMigration(
     table,
     tableInfo,
@@ -112,6 +189,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     )
   )
 
+  /**
+   * Changes the default value of columns based on the column definitions in `cols`
+   * @param cols zero or more column-returning functions, which are passed the table object.
+   * @example {{{ tblMig.alterColumnDefaults(_.col1, _.column[Int]("col2", O.Default("notTheDefaultInTableDef"))) }}}
+   * @group oper
+   */
   def alterColumnDefaults(cols: (T => Column[_])*) = new IrreversibleTableMigration(
     table,
     tableInfo,
@@ -121,6 +204,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     )
   )
 
+  /**
+   * Changes the nullability of columns based on the column definitions in `cols`
+   * @param cols zero or more column-returning functions, which are passed the table object.
+   * @example {{{ tblMig.alterColumnNulls(_.col1, _.column[Int]("col2", O.NotNull)) }}}
+   * @group oper
+   */
   def alterColumnNulls(cols: (T => Column[_])*) = new IrreversibleTableMigration(
     table,
     tableInfo,
@@ -130,6 +219,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     )
   )
 
+  /**
+   * Adds primary key constraints.
+   * @param pks zero or more `PrimaryKey`-returning functions, which are passed the table object.
+   * @example {{{ tblMig.addPrimaryKeys(_.pkDef) }}}
+   * @group oper
+   */
   def addPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
     primaryKeysCreate = data.primaryKeysCreate ++
       pks.map { f =>
@@ -138,6 +233,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       }
   ))
 
+  /**
+   * Drops primary key constraints.
+   * @param pks zero or more `PrimaryKey`-returning functions, which are passed the table object.
+   * @example {{{ tblMig.dropPrimaryKeys(_.pkDef) }}}
+   * @group oper
+   */
   def dropPrimaryKeys(pks: (T => PrimaryKey)*) = withData(data.copy(
     primaryKeysDrop = data.primaryKeysDrop ++
       pks.map { f =>
@@ -146,6 +247,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       }
   ))
 
+  /**
+   * Adds foreign key constraints.
+   * @param fkqs zero or more `ForeignKeyQuery`-returning functions, which are passed the table object.
+   * @example {{{ tblMig.addForeignKeys(_.fkDef) }}}
+   * @group oper
+   */
   def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
     foreignKeysCreate = data.foreignKeysCreate ++
       fkqs.flatMap { f =>
@@ -154,6 +261,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       }
   ))
 
+  /**
+   * Drops foreign key constraints.
+   * @param fkqs zero or more `ForeignKeyQuery`-returning functions, which are passed the table object.
+   * @example {{{ tblMig.dropForeignKeys(_.fkDef) }}}
+   * @group oper
+   */
   def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
     foreignKeysDrop = data.foreignKeysDrop ++
       fkqs.flatMap { f =>
@@ -162,6 +275,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       }
   ))
 
+  /**
+   * Adds indexes
+   * @param indexes zero or more `Index`-returning functions, which are passed the table object.
+   * @example {{{ tblMig.addIndexes(_.idxDef) }}}
+   * @group oper
+   */
   def addIndexes(indexes: (T => Index)*) = withData(data.copy(
     indexesCreate = data.indexesCreate ++
       indexes.map { f =>
@@ -170,6 +289,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       }
   ))
 
+  /**
+   * Drops indexes
+   * @param indexes zero or more `Index`-returning functions, which are passed the table object.
+   * @example {{{ tblMig.dropIndexes(_.idxDef) }}}
+   * @group oper
+   */
   def dropIndexes(indexes: (T => Index)*) = withData(data.copy(
     indexesDrop = data.indexesDrop ++
       indexes.map { f =>
@@ -178,6 +303,12 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       }
   ))
 
+  /**
+   * Renames an index
+   * @param index an `Index`-returning function, which is passed the table object.
+   * @example {{{ tblMig.renameIndex(_.idxDef, "newName") }}}
+   * @group oper
+   */
   def renameIndex(index: (T => Index), to: String) = withData(data.copy(
     indexesRename = data.indexesRename +
       (indexInfo(index(table)) -> to)
@@ -192,13 +323,26 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
   }
 }
 
+/**
+ * The concrete [[TableMigration]] class used when irreversible operations are to be performed
+ * (such as dropping a table)
+ */
 final class IrreversibleTableMigration[T <: JdbcDriver#Table[_]] private[api](table: T, override val tableInfo: TableInfo, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_]) extends TableMigration[T](table) {
   type Self = IrreversibleTableMigration[T]
   protected def withData(d: TableMigrationData) = new IrreversibleTableMigration(table, tableInfo, d)
 }
 
+/**
+ * The concrete [[TableMigration]] class used when all operations are reversible.
+ * This class extends [[ReversibleMigration]] and as such includes a [[reverse]] method
+ * that returns a `TableMigration` that performs the inverse operations ("down migration").
+ */
 final class ReversibleTableMigration[T <: JdbcDriver#Table[_]] private[api](table: T, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_]) extends TableMigration[T](table) with ReversibleMigration { outer =>
 
+  /*
+   * This should be redundant since the constructor is private[api] and should only be called
+   * when these requirements are known to hold.
+   */
   require(data.tableDrop == false)
   require(data.columnsAlterType.isEmpty)
   require(data.columnsAlterDefault.isEmpty)

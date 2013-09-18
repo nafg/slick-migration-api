@@ -5,6 +5,16 @@ import driver._
 import ast.{ FieldSymbol, TableNode }
 import lifted.ForeignKeyAction
 
+/**
+ * Base class for database dialects.
+ * Provides methods that return the dialect-specific SQL strings
+ * for performing various database operations.
+ * The most important method is perhaps [[migrateTable]], which is called from
+ * [[TableMigration#sql]].
+ * These methods are to be overriden in database-specific subclasses as needed.
+ * @tparam D The corresponding Slick driver type.
+ *           Not used, but may come in handy in certain situations.
+ */
 class Dialect[-D <: JdbcDriver] extends AstHelpers {
   def quoteIdentifier(id: String): String = {
     val s = new StringBuilder(id.length + 4) append '"'
