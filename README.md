@@ -4,6 +4,7 @@ that are defined in terms of Slick table definitions.
 
 Example:
 
+````scala
 implicit val dialect = new H2Dialect
 
 val migrate =
@@ -17,3 +18,4 @@ val migrate =
 withSession { implicit session: Session =>
   migrate()
 }
+````
