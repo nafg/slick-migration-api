@@ -14,8 +14,8 @@ object ReversibleTableMigrationCompileTimeTest {
     def * = col1 ~ col2
   }
 
-  type Rev = TableMigrationImpl.ReversibleTableMigration[table1.type]
-  type Irr = TableMigrationImpl.IrreversibleTableMigration[table1.type]
+  type Rev = ReversibleTableMigration[table1.type]
+  type Irr = IrreversibleTableMigration[table1.type]
 
   // An empty TableMigration is reversible
   val tm = TableMigration(table1)
