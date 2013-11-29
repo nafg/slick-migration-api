@@ -8,17 +8,18 @@ object ReversibleTableMigrationCompileTimeTest {
 
   import H2Driver.simple._
 
-  object table1 extends Table[(Int, Int)]("table1") {
+  val table1 = TableQuery[Table1]
+  class Table1(tag: Tag) extends Table[(Int, Int)](tag, "table1") {
     def col1 = column[Int]("col1")
     def col2 = column[Int]("col2")
-    def * = col1 ~ col2
+    def * = (col1, col2)
   }
 
-  type Rev = ReversibleTableMigration[table1.type]
-  type Irr = IrreversibleTableMigration[table1.type]
+  type Rev = ReversibleTableMigration[Table1]
+  type Irr = IrreversibleTableMigration[Table1]
 
   // An empty TableMigration is reversible
-  val tm = TableMigration(table1)
+  val tm = TableMigration(table1.baseTableRow)
   implicitly[tm.type <:< Rev]
 
   // A reversible operation on a reversible TableMigration: still reversible

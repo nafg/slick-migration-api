@@ -3,7 +3,7 @@ package migration.api
 
 import scala.slick.driver.JdbcDriver
 import scala.slick.ast.{ FieldSymbol, Node, TableNode }
-import scala.slick.lifted.{ Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey }
+import scala.slick.lifted.{ AbstractTable, Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey, TableQuery }
 
 /**
  * Internal data stucture that stores schema manipulation operations to be perfomed on a table
@@ -28,9 +28,9 @@ protected[api] case class TableMigrationData(
   // not reversible: insufficient info: don't have old data
   columnsAlterNullability: Seq[ColumnInfo] = Nil,
   // reverse: drop instead of create
-  foreignKeysCreate: Seq[ForeignKey[_ <: TableNode, _]] = Nil,
+  foreignKeysCreate: Seq[ForeignKey] = Nil,
   // reverse: create instead of drop
-  foreignKeysDrop: Seq[ForeignKey[_ <: TableNode, _]] = Nil,
+  foreignKeysDrop: Seq[ForeignKey] = Nil,
   // reverse: drop instead of create
   primaryKeysCreate: Seq[(String, Seq[FieldSymbol])] = Nil,
   // reverse: create instead of drop
@@ -51,6 +51,12 @@ object TableMigration {
    * Creates a [[TableMigration]] that will perform migrations on `table`
    */
   def apply[T <: JdbcDriver#Table[_]](table: T)(implicit dialect: Dialect[_]) = new ReversibleTableMigration(table, TableMigrationData())
+
+  /**
+   * Creates a [[TableMigration]] that will perform migrations on the table
+   * referenced by `tableQuery`
+   */
+  def apply[T <: JdbcDriver#Table[_]](tableQuery: TableQuery[T, _])(implicit dialect: Dialect[_]) = new ReversibleTableMigration(tableQuery.baseTableRow, TableMigrationData())
 }
 
 /**
@@ -253,11 +259,11 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.addForeignKeys(_.fkDef) }}}
    * @group oper
    */
-  def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
+  def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: AbstractTable[_], _])*) = withData(data.copy(
     foreignKeysCreate = data.foreignKeysCreate ++
       fkqs.flatMap { f =>
         val fkq = f(table)
-        fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
+        fkq.fks: Seq[ForeignKey]
       }
   ))
 
@@ -267,11 +273,11 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.dropForeignKeys(_.fkDef) }}}
    * @group oper
    */
-  def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: TableNode, _])*) = withData(data.copy(
+  def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: AbstractTable[_], _])*) = withData(data.copy(
     foreignKeysDrop = data.foreignKeysDrop ++
       fkqs.flatMap { f =>
         val fkq = f(table)
-        fkq.fks: Seq[ForeignKey[_ <: TableNode, _]]
+        fkq.fks: Seq[ForeignKey]
       }
   ))
 

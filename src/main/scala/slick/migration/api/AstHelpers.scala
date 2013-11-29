@@ -84,5 +84,5 @@ private[api] trait AstHelpers {
   /**
    * @return an `IndexInfo` containing the relevant information from a Slick `Index`
    */
-  protected def indexInfo(index: Index) = IndexInfo(index.table, index.name, index.unique, index.on flatMap (fieldSym(_)))
+  protected def indexInfo(index: Index) = IndexInfo(index.table.tableNode, index.name, index.unique, index.on flatMap (fieldSym(_)))
 }

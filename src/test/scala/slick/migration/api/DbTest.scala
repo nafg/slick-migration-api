@@ -42,11 +42,12 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
   def columnDefaultFormat(s: String) = s"'$s'"
 
   test("create, drop") {
-    object table1 extends Table[(Long, String)]("table1") {
+    class Table1(tag: Tag) extends Table[(Long, String)](tag, "table1") {
       def id = column[Long]("id", O.NotNull, O.AutoInc, O.PrimaryKey)
       def col1 = column[String]("col1", O.Default("abc"))
-      def * = id ~ col1
+      def * = (id, col1)
     }
+    val table1 = TableQuery[Table1]
 
     val before = getTables
 
@@ -57,9 +58,9 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
 
     try {
       val after = getTables
-
+      val tableName = table1.baseTableRow.tableName
       inside(after filterNot before.contains) {
-        case (table @ MTable(MQName(_, _, table1.tableName), "TABLE", _, _, _, _)) :: Nil =>
+        case (table @ MTable(MQName(_, _, `tableName`), "TABLE", _, _, _, _)) :: Nil =>
           val cols = table.getColumns.list
           cols.map(col => (col.column, col.sqlType, col.nullable)) should equal (List(
             ("id", longJdbcType, Some(false)),
@@ -80,12 +81,13 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
   }
 
   test("addColumns") {
-    object table5 extends Table[(Long, String, Option[Int])]("table5") {
+    class Table5(tag: Tag) extends Table[(Long, String, Option[Int])](tag, "table5") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2", O.Default(""))
       def col3 = column[Option[Int]]("col3")
-      def * = col1 ~ col2 ~ col3
+      def * = (col1, col2, col3)
     }
+    val table5 = TableQuery[Table5]
 
     val tm = TableMigration(table5)
     tm.create.addColumns(_.col1)()
@@ -106,15 +108,16 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
   }
 
   test("addIndexes, dropIndexes") {
-    object table4 extends Table[(Long, Int, Int, Int)]("table4") {
+    class Table4(tag: Tag) extends Table[(Long, Int, Int, Int)](tag, "table4") {
       def id = column[Long]("id")
       def col1 = column[Int]("col1")
       def col2 = column[Int]("col2")
       def col3 = column[Int]("col3")
-      def * = id ~ col1 ~ col2 ~ col3
+      def * = (id, col1, col2, col3)
       val index1 = index("index1", col1)
-      val index2 = index("index2", col2 ~ col3, true)
+      val index2 = index("index2", (col2, col3), true)
     }
+    val table4 = TableQuery[Table4]
 
     def indexList = getTable("table4").map(_.getIndexInfo().list) getOrElse Nil
     def indexes = indexList
@@ -146,13 +149,15 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
   }
 
   test("rename, renameIndex") {
-    class table(name: String) extends Table[Long](name) {
+    class Table7Base(tag: Tag, name: String) extends Table[Long](tag, name) {
       def col1 = column[Long]("col1")
       def * = col1
       val index1 = index("oldIndexName", col1)
     }
-    object oldname extends table("oldname")
-    object table7 extends table("table7")
+    class OldName(tag: Tag) extends Table7Base(tag, "oldname")
+    class Table7(tag: Tag) extends Table7Base(tag, "table7")
+    val oldname = TableQuery[OldName]
+    val table7 = TableQuery[Table7]
 
     val tm = TableMigration(oldname)
     tm.create.addColumns(_.col1).addIndexes(_.index1)()
@@ -188,12 +193,13 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
         _ collect { case MPrimaryKey(MQName(_, _, "table8"), col, seq, _) => (seq, col) }
       }
 
-    object table8 extends Table[(Long, String)]("table8") {
+    class Table8(tag: Tag) extends Table[(Long, String)](tag, "table8") {
       def id = column[Long]("id")
       def stringId = column[String]("stringId")
-      def * = id ~ stringId
-      def pk = primaryKey("PRIMARY", id ~ stringId)  // note mysql will always use the name "PRIMARY" anyway
+      def * = (id, stringId)
+      def pk = primaryKey("PRIMARY", (id, stringId))  // note mysql will always use the name "PRIMARY" anyway
     }
+    val table8 = TableQuery[Table8]
 
     val tm = TableMigration(table8)
     tm.create.addColumns(_.id, _.stringId)()
@@ -216,18 +222,20 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
   }
 
   test("addForeignKeys, dropForeignKeys") {
-    object table2 extends Table[(Long, Long)]("table2") {
-      def id = column[Long]("id", O.PrimaryKey)
-      def other = column[Long]("other")
-
-      def * = id ~ other
-      // not a def, so that equality works
-      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.NoAction, ForeignKeyAction.Cascade)
-    }
-    object table3 extends Table[Long]("table3") {
+    class Table3(tag: Tag) extends Table[Long](tag, "table3") {
       def id = column[Long]("id", O.PrimaryKey)
       def * = id
     }
+    val table3 = TableQuery[Table3]
+    class Table2(tag: Tag) extends Table[(Long, Long)](tag, "table2") {
+      def id = column[Long]("id", O.PrimaryKey)
+      def other = column[Long]("other")
+
+      def * = (id, other)
+      // not a def, so that equality works
+      lazy val fk = foreignKey("fk_other", other, table3)(_.id, ForeignKeyAction.NoAction, ForeignKeyAction.Cascade)
+    }
+    val table2 = TableQuery[Table2]
 
     val tm2 = TableMigration(table2)
     val tm3 = TableMigration(table3)
@@ -261,7 +269,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
 
       val dropForeignKey = createForeignKey.reverse
 
-      dropForeignKey.data.foreignKeysDrop.toList should equal (table2.fk.fks.toList)
+      dropForeignKey.data.foreignKeysDrop.toList should equal (table2.baseTableRow.fk.fks.toList)
       dropForeignKey should equal (tm2.dropForeignKeys(_.fk))
 
       dropForeignKey()
@@ -274,11 +282,12 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
   }
 
   test("dropColumns") {
-    object table11 extends Table[(Long, String)]("table11") {
+    class Table11(tag: Tag) extends Table[(Long, String)](tag, "table11") {
       def col1 = column[Long]("col1")
       def col2 = column[String]("col2", O.Default(""))
-      def * = col1 ~ col2
+      def * = (col1, col2)
     }
+    val table11 = TableQuery[Table11]
 
     val tm = TableMigration(table11)
     tm.create.addColumns(_.col1, _.col2)()
@@ -298,11 +307,12 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
   }
 
   test("alterColumnTypes") {
-    object table6 extends Table[String]("table6") {
+    class Table6(tag: Tag) extends Table[String](tag, "table6") {
       def tmpOldId = column[java.sql.Date]("id")
       def id = column[String]("id", O.Default(""))
       def * = id
     }
+    val table6 = TableQuery[Table6]
 
     val tm = TableMigration(table6)
     tm.create.addColumns(_.tmpOldId)()
@@ -318,11 +328,12 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
   }
 
   test("alterColumnDefaults") {
-    object table9 extends Table[String]("table9") {
+    class Table9(tag: Tag) extends Table[String](tag, "table9") {
       def tmpOldId = column[String]("id")
       def id = column[String]("id", O.Default("abc"))
       def * = id
     }
+    val table9 = TableQuery[Table9]
 
     val tm = TableMigration(table9)
     tm.create.addColumns(_.tmpOldId)()
@@ -338,33 +349,35 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
   }
 
   test("alterColumnNulls") {
-    object table10 extends Table[String]("table10") {
+    class Table10(tag: Tag) extends Table[String](tag, "table10") {
       def tmpOldId = column[String]("id", O.Nullable)
       def id = column[String]("id", O.NotNull)
       def * = id
     }
+    val table10 = TableQuery[Table10]
 
     val tm = TableMigration(table10)
     tm.create.addColumns(_.tmpOldId)()
 
     try {
-      table10.tmpOldId.insert(null: String)
-      Query(table10).delete
+      table10.map(_.tmpOldId).insert(null: String)
+      table10.delete
 
       tm.alterColumnNulls(_.id)()
 
       intercept[SQLException] {
-        table10.id.insert(null: String)
+        table10.map(_.id).insert(null: String)
       }
     } finally
       tm.drop.apply()
   }
 
   test("renameColumn") {
-    object table12 extends Table[Long]("table12") {
+    class Table12(tag: Tag) extends Table[Long](tag, "table12") {
       def col1 = column[Long]("oldname")
       def * = col1
     }
+    val table12 = TableQuery[Table12]
 
     def columns = getTable("table12").toList.flatMap(_.getColumns.list.map(_.column))
 
