@@ -104,7 +104,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
 
   private def colInfo(f: T => Column[_]): ColumnInfo = {
     val col = f(table)
-    fieldSym(Node(col)) match {
+    fieldSym(col.toNode) match {
       case Some(c) =>
         table.tableProvider match {
           case driver: JdbcDriver => columnInfo(driver, c)

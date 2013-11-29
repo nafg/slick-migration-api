@@ -60,7 +60,7 @@ private[api] trait AstHelpers {
    * @return a `FieldSymbol` representing the column
    */
   protected def fieldSym(column: Column[_]): FieldSymbol =
-    fieldSym(Node(column)) getOrElse sys.error("Invalid column: " + column)
+    fieldSym(column.toNode) getOrElse sys.error("Invalid column: " + column)
 
   /**
    * @param driver a Slick driver, used to extract `ColumnInfo#sqlType` and `ColumnInfo#notNull`
