@@ -56,7 +56,7 @@ object TableMigration {
    * Creates a [[TableMigration]] that will perform migrations on the table
    * referenced by `tableQuery`
    */
-  def apply[T <: JdbcDriver#Table[_]](tableQuery: TableQuery[T, _])(implicit dialect: Dialect[_]) = new ReversibleTableMigration(tableQuery.baseTableRow, TableMigrationData())
+  def apply[T <: JdbcDriver#Table[_]](tableQuery: TableQuery[T])(implicit dialect: Dialect[_]) = new ReversibleTableMigration(tableQuery.baseTableRow, TableMigrationData())
 }
 
 /**
