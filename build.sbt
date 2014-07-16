@@ -4,7 +4,13 @@ organization := "io.github.nafg"
 
 name := "slick-migration-api"
 
+instrumentSettings
+
+CoverallsPlugin.coverallsSettings
+
 parallelExecution in Test := false
+
+parallelExecution in ScoverageTest := false
 
 libraryDependencies += "com.typesafe.slick" %% "slick"                % "2.0.2"
 
