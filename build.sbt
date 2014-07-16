@@ -4,6 +4,8 @@ organization := "io.github.nafg"
 
 name := "slick-migration-api"
 
+parallelExecution in Test := false
+
 libraryDependencies += "com.typesafe.slick" %% "slick"                % "2.0.2"
 
 libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "2.0.2"         % "test"

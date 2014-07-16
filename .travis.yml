@@ -1,0 +1,9 @@
+language: scala
+script: sbt compile && sbt test
+before_script:
+- mkdir -p test-dbs/postgres
+- sudo chown postgres:postgres test-dbs/postgres/
+scala:
+- 2.10.4
+addons:
+  postgresql: "9.3"
