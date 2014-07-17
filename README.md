@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/pussinboots/slick-migration-api.svg?branch=master)](https://travis-ci.org/pussinboots/slick-migration-api)
+[![Coverage Status](https://img.shields.io/coveralls/pussinboots/slick-migration-api.svg)](https://coveralls.io/r/pussinboots/slick-migration-api?branch=master)
+
+
 A library for defining database migrations, for use with Slick,
 including a DSL to define type safe and typo safe table migrations
 that are defined in terms of Slick table definitions.
