@@ -1,4 +1,4 @@
-scalaVersion := "2.10.3"
+crossScalaVersions := Seq("2.11.2", "2.10.4")
 
 organization := "io.github.nafg"
 
@@ -12,11 +12,11 @@ parallelExecution in Test := false
 
 parallelExecution in ScoverageTest := false
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "2.0.2"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "2.1.0-RC3"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "2.0.2"         % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "2.1.0-RC3"     % "test"
 
-libraryDependencies += "org.scalatest"      %% "scalatest"            % "2.0.M6-SNAP34" % "test"
+libraryDependencies += "org.scalatest"      %% "scalatest"            % "2.2.0"         % "test"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "1.3.170"       % "test"
 

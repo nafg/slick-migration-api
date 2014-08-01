@@ -3,7 +3,7 @@ package migration.api
 
 import driver._
 import ast.{ FieldSymbol, TableNode }
-import lifted.ForeignKeyAction
+import model.ForeignKeyAction
 
 /**
  * Base class for database dialects.

@@ -5,18 +5,21 @@ import java.sql.{SQLException, Types}
 
 import scala.slick.jdbc.JdbcBackend
 import scala.slick.jdbc.meta.{MIndexInfo, MPrimaryKey, MQName, MTable}
-import scala.slick.lifted.ForeignKeyAction
-
+import scala.slick.driver.JdbcDriver
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Inside}
 import org.scalatest.matchers.ShouldMatchers
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
 
-abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTestDB { type Driver <: Drv }) extends FunSuite with ShouldMatchers with Inside with BeforeAndAfterAll {
+abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(implicit protected val dialect: Dialect[D])
+  extends FunSuite
+  with ShouldMatchers
+  with Inside
+  with BeforeAndAfterAll {
 
   implicit lazy val session = tdb.createDB.createSession
 
-  lazy val driver: Drv = tdb.driver
+  lazy val driver: D = tdb.driver
 
   import driver.simple._
 
@@ -62,14 +65,14 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
       inside(after filterNot before.contains) {
         case (table @ MTable(MQName(_, _, `tableName`), "TABLE", _, _, _, _)) :: Nil =>
           val cols = table.getColumns.list
-          cols.map(col => (col.column, col.sqlType, col.nullable)) should equal (List(
+          cols.map(col => (col.name, col.sqlType, col.nullable)) should equal (List(
             ("id", longJdbcType, Some(false)),
             ("col1", Types.VARCHAR, Some(false))
           ))
-          val autoinc: Map[String, Boolean] = cols.flatMap(col => col.isAutoInc.map(col.column -> _)).toMap
+          val autoinc: Map[String, Boolean] = cols.flatMap(col => col.isAutoInc.map(col.name -> _)).toMap
           autoinc.get("id") foreach (_ should equal (true))
           autoinc.get("col1") foreach (_ should equal (false))
-          cols.find(_.column == "col1").flatMap(_.columnDef).foreach(_ should equal (columnDefaultFormat("abc")))
+          cols.find(_.name == "col1").flatMap(_.columnDef).foreach(_ should equal (columnDefaultFormat("abc")))
       }
 
       tm.create.reverse should equal (tm.drop)
@@ -182,7 +185,7 @@ abstract class BasicDbTest[Drv <: driver.JdbcDriver : Dialect](val tdb: JdbcTest
   }
 }
 
-abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type Driver <: Drv }) extends BasicDbTest[Drv](tdb) {
+trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
   import driver.simple._
 
   test("addPrimaryKeys, dropPrimaryKeys") {
@@ -379,7 +382,7 @@ abstract class DbTest[Drv <: driver.JdbcDriver : Dialect](tdb: JdbcTestDB { type
     }
     val table12 = TableQuery[Table12]
 
-    def columns = getTable("table12").toList.flatMap(_.getColumns.list.map(_.column))
+    def columns = getTable("table12").toList.flatMap(_.getColumns.list.map(_.name))
 
     val tm = TableMigration(table12)
     tm.create.addColumns(_.col1)()
