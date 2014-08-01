@@ -68,8 +68,8 @@ private[api] trait AstHelpers {
    * @return a `ColumnInfo` representing the relevant information in `column`
    */
   protected def columnInfo(driver: JdbcDriver, column: FieldSymbol): ColumnInfo = {
-    val ti = driver.typeInfoFor(column.tpe)
-    val initial = ColumnInfo(column.name, ti.sqlTypeName, !ti.nullable, false, false, None)
+    val ti = driver.jdbcTypeFor(column.tpe)
+    val initial = ColumnInfo(column.name, ti.sqlTypeName, !ti.scalaType.nullable, false, false, None)
     column.options.foldLeft(initial) {
       case (ci, ColumnOption.DBType(s))  => ci.copy(sqlType = s)
       case (ci, ColumnOption.NotNull)    => ci.copy(notNull = true)
