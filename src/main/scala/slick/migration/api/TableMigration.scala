@@ -6,7 +6,7 @@ import scala.slick.ast.{ FieldSymbol, Node, TableNode }
 import scala.slick.lifted.{ AbstractTable, Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey, TableQuery }
 
 /**
- * Internal data stucture that stores schema manipulation operations to be perfomed on a table
+ * Internal data structure that stores schema manipulation operations to be performed on a table
  */
 protected[api] case class TableMigrationData(
   // not reversible: insufficient info: don't know entire old table
