@@ -41,7 +41,29 @@ protected[api] case class TableMigrationData(
   indexesDrop: Seq[IndexInfo] = Nil,
   // reverse: reverse rename
   indexesRename: Map[IndexInfo, String] = Map.empty
-)
+) {
+  override def productPrefix = "Table Migration of: "
+  /* (non-Javadoc)
+ * @see java.lang.Object#toString()
+ */
+override def toString = "" +
+    {if (tableDrop == true)           "Drop Table"} +
+    {if (tableCreate == true)         "Create Table"} +
+    {if (tableRename.isDefined)       "Rename to "      + tableRename.get} +
+    {if (!columnsCreate.isEmpty)      "Create columns " + columnsCreate.map(_.name)} +
+    {if (!columnsDrop.isEmpty)        "Drop Columns "   + columnsDrop.map(_.name)} +
+    {if (!columnsRename.isEmpty)      "Rename Columns " + columnsRename.map{case (from, to) => (from.name + " -> " + to)}} +
+    {if (!columnsAlterType.isEmpty)   "Alter Type "     + columnsAlterType.map(c => c.name + "-" + c.sqlType)} +
+    {if (!columnsAlterDefault.isEmpty)"Alter Default "  + columnsAlterDefault.map(c => c.name + "-" + c.default.getOrElse("none"))} +
+    {if (!columnsAlterNullability.isEmpty) "Alter Nullability " + columnsAlterNullability.map(c => c.name + "-" + !c.notNull)} +
+    {if (!foreignKeysCreate.isEmpty)  "Add FK "          + foreignKeysCreate.map{_.name}} +  //TODO the next few are messy, clean them up
+    {if (!foreignKeysDrop.isEmpty)    "Drop FK "         + foreignKeysDrop.map(_.name)} +
+    {if (!primaryKeysCreate.isEmpty)  "Create PK "       + primaryKeysCreate} +
+    {if (!primaryKeysDrop.isEmpty)    "Drop PK "         + primaryKeysDrop} +
+    {if (!indexesCreate.isEmpty)      "Create Indexes "  + indexesCreate.map(_.name)} +
+    {if (!indexesDrop.isEmpty)        "Drop Indexes "    + indexesCreate.map(_.name)} +
+    {if (!indexesRename.isEmpty)      "Rename Index "    + indexesRename.map{case (from, to) => from.name + " -> " + to}}
+}
 
 /**
  * Factory for [[TableMigration]]s
