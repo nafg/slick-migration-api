@@ -41,7 +41,34 @@ protected[api] case class TableMigrationData(
   indexesDrop: Seq[IndexInfo] = Nil,
   // reverse: reverse rename
   indexesRename: Map[IndexInfo, String] = Map.empty
-)
+) {
+  override def productPrefix = "Table Migration of: "
+  /* (non-Javadoc)
+ * @see java.lang.Object#toString()
+ */
+
+  private def ifStr(test: Boolean)(str: =>String) = if(test) str else ""
+  private def wrap(data: Iterable[String]) = data.mkString("(",",",")")
+  private def wrap(data: String) = "(" + data + ")"
+
+  override def toString = "" +
+    ifStr(tableDrop)                   ("dropTable")     +
+    ifStr(tableCreate)                 ("createTable")   +
+    ifStr(tableRename.isDefined)       ("renameTable to "+ wrap(tableRename.getOrElse("<error>"))) +
+    ifStr(columnsCreate.nonEmpty)      ("addColumns"  + wrap(columnsCreate.map(_.name))) +
+    ifStr(columnsDrop.nonEmpty)        ("dropColumns"    + wrap(columnsDrop.map(_.name))) +
+    ifStr(columnsRename.nonEmpty)      ("renameColumns"  + wrap(columnsRename.map{case (from, to) => from.name + " -> " + to})) +
+    ifStr(columnsAlterType.nonEmpty)   ("alterColumnTypes"      + wrap(columnsAlterType.map(c => c.name + "-" + c.sqlType))) +
+    ifStr(columnsAlterDefault.nonEmpty)("alterColumnDefaults"   + wrap(columnsAlterDefault.map(c => c.name + "-" + c.default.getOrElse("<null>")))) +
+    ifStr(columnsAlterNullability.nonEmpty) ("alterColumnNullability" + wrap(columnsAlterNullability.map(c => c.name + "-" + !c.notNull))) +
+    ifStr(foreignKeysCreate.nonEmpty)  ("addForeignKeys"          + wrap(foreignKeysCreate.map{_.name}))  +   //TODO the next few are messy, clean them up
+    ifStr(foreignKeysDrop.nonEmpty)    ("dropForeignKeys"         + wrap(foreignKeysDrop.map(_.name)))    +
+    ifStr(primaryKeysCreate.nonEmpty)  ("createPrimaryKeys"       + wrap(primaryKeysCreate.map(_.toString)))              +
+    ifStr(primaryKeysDrop.nonEmpty)    ("dropPrimaryKeys"         + wrap(primaryKeysDrop.map(_.toString)))                +
+    ifStr(indexesCreate.nonEmpty)      ("createIndexes"  + wrap(indexesCreate.map(_.name)))      +
+    ifStr(indexesDrop.nonEmpty)        ("dropIndexes"    + wrap(indexesCreate.map(_.name)))      +
+    ifStr(indexesRename.nonEmpty)      ("renameIndexes"    + wrap(indexesRename.map{case (from, to) => from.name + " -> " + to}))
+}
 
 /**
  * Factory for [[TableMigration]]s
@@ -327,6 +354,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       (that.tableInfo, that.data) == (this.tableInfo, this.data)
     case _ => false
   }
+  override def toString = s"TableMigration{${data.toString}}"
 }
 
 /**
