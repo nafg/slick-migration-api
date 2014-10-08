@@ -349,6 +349,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       (that.tableInfo, that.data) == (this.tableInfo, this.data)
     case _ => false
   }
+  override def toString = s"TableMigration of ${table.tableName} : ${TableMigrationData}"
 }
 
 /**
