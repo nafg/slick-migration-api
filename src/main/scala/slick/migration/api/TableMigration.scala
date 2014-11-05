@@ -46,23 +46,28 @@ protected[api] case class TableMigrationData(
   /* (non-Javadoc)
  * @see java.lang.Object#toString()
  */
-override def toString = "" +
-    {if (tableDrop == true)           "Drop Table"} +
-    {if (tableCreate == true)         "Create Table"} +
-    {if (tableRename.isDefined)       "Rename to "      + tableRename.get} +
-    {if (!columnsCreate.isEmpty)      "Create columns " + columnsCreate.map(_.name)} +
-    {if (!columnsDrop.isEmpty)        "Drop Columns "   + columnsDrop.map(_.name)} +
-    {if (!columnsRename.isEmpty)      "Rename Columns " + columnsRename.map{case (from, to) => (from.name + " -> " + to)}} +
-    {if (!columnsAlterType.isEmpty)   "Alter Type "     + columnsAlterType.map(c => c.name + "-" + c.sqlType)} +
-    {if (!columnsAlterDefault.isEmpty)"Alter Default "  + columnsAlterDefault.map(c => c.name + "-" + c.default.getOrElse("none"))} +
-    {if (!columnsAlterNullability.isEmpty) "Alter Nullability " + columnsAlterNullability.map(c => c.name + "-" + !c.notNull)} +
-    {if (!foreignKeysCreate.isEmpty)  "Add FK "          + foreignKeysCreate.map{_.name}} +  //TODO the next few are messy, clean them up
-    {if (!foreignKeysDrop.isEmpty)    "Drop FK "         + foreignKeysDrop.map(_.name)} +
-    {if (!primaryKeysCreate.isEmpty)  "Create PK "       + primaryKeysCreate} +
-    {if (!primaryKeysDrop.isEmpty)    "Drop PK "         + primaryKeysDrop} +
-    {if (!indexesCreate.isEmpty)      "Create Indexes "  + indexesCreate.map(_.name)} +
-    {if (!indexesDrop.isEmpty)        "Drop Indexes "    + indexesCreate.map(_.name)} +
-    {if (!indexesRename.isEmpty)      "Rename Index "    + indexesRename.map{case (from, to) => from.name + " -> " + to}}
+
+  private def ifStr(test: Boolean)(str: =>String) = if(test) str else ""
+  private def wrap(data: Iterable[String]) = data.mkString("(",",",")")
+  private def wrap(data: String) = "(" + data + ")"
+
+  override def toString = "" +
+    ifStr(tableDrop)                   ("dropTable")     +
+    ifStr(tableCreate)                 ("createTable")   +
+    ifStr(tableRename.isDefined)       ("renameTable to "+ wrap(tableRename.getOrElse("<error>"))) +
+    ifStr(columnsCreate.nonEmpty)      ("addColumns"  + wrap(columnsCreate.map(_.name))) +
+    ifStr(columnsDrop.nonEmpty)        ("dropColumns"    + wrap(columnsDrop.map(_.name))) +
+    ifStr(columnsRename.nonEmpty)      ("renameColumns"  + wrap(columnsRename.map{case (from, to) => from.name + " -> " + to})) +
+    ifStr(columnsAlterType.nonEmpty)   ("alterColumnTypes"      + wrap(columnsAlterType.map(c => c.name + "-" + c.sqlType))) +
+    ifStr(columnsAlterDefault.nonEmpty)("alterColumnDefaults"   + wrap(columnsAlterDefault.map(c => c.name + "-" + c.default.getOrElse("<null>")))) +
+    ifStr(columnsAlterNullability.nonEmpty) ("alterColumnNullability" + wrap(columnsAlterNullability.map(c => c.name + "-" + !c.notNull))) +
+    ifStr(foreignKeysCreate.nonEmpty)  ("addForeignKeys"          + wrap(foreignKeysCreate.map{_.name}))  +   //TODO the next few are messy, clean them up
+    ifStr(foreignKeysDrop.nonEmpty)    ("dropForeignKeys"         + wrap(foreignKeysDrop.map(_.name)))    +
+    ifStr(primaryKeysCreate.nonEmpty)  ("createPrimaryKeys"       + wrap(primaryKeysCreate.map(_.toString)))              +
+    ifStr(primaryKeysDrop.nonEmpty)    ("dropPrimaryKeys"         + wrap(primaryKeysDrop.map(_.toString)))                +
+    ifStr(indexesCreate.nonEmpty)      ("createIndexes"  + wrap(indexesCreate.map(_.name)))      +
+    ifStr(indexesDrop.nonEmpty)        ("dropIndexes"    + wrap(indexesCreate.map(_.name)))      +
+    ifStr(indexesRename.nonEmpty)      ("renameIndexes"    + wrap(indexesRename.map{case (from, to) => from.name + " -> " + to}))
 }
 
 /**
@@ -349,7 +354,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
       (that.tableInfo, that.data) == (this.tableInfo, this.data)
     case _ => false
   }
-  override def toString = s"TableMigration of ${table.tableName} : ${TableMigrationData}"
+  override def toString = s"TableMigration{${data.toString}}"
 }
 
 /**
