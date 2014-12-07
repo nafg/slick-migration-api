@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/pussinboots/slick-migration-api.svg?branch=master)](https://travis-ci.org/pussinboots/slick-migration-api)
+[![Build Status](https://travis-ci.org/pussinboots/slick-migration-api.svg?branch=master)](https://travis-ci.org/nafg/slick-migration-api)
 [![Coverage Status](https://img.shields.io/coveralls/pussinboots/slick-migration-api.svg)](https://coveralls.io/r/pussinboots/slick-migration-api?branch=master)
 
 
