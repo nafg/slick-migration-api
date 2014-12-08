@@ -1,9 +1,9 @@
 language: scala
-script: sbt +coveralls +test +publish
+script: "sbt +clean +coverage +test +publish"
 before_script:
 - mkdir -p test-dbs/postgres
 - sudo chown postgres:postgres test-dbs/postgres/
-scala:
-- 2.10.4
-addons:
-  postgresql: "9.3"
+after_success: "sbt coveralls"
+services:
+  - mysql
+  - postgresql
