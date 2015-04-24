@@ -1,9 +1,11 @@
 language: scala
-script: "sbt +clean +coverage +test +publish"
+script: "sbt +clean +coverage +test"
 before_script:
 - mkdir -p test-dbs/postgres
 - sudo chown postgres:postgres test-dbs/postgres/
-after_success: "sbt coveralls"
+after_success:
+- "sbt coveralls"
+- "sbt +publish"
 services:
   - mysql
   - postgresql
