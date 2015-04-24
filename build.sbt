@@ -1,4 +1,4 @@
-crossScalaVersions := Seq("2.11.4", "2.10.4")
+crossScalaVersions := Seq("2.11.6", "2.10.5")
 
 organization := "io.github.nafg"
 
