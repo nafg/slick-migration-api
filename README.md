@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/pussinboots/slick-migration-api.svg?branch=master)](https://travis-ci.org/nafg/slick-migration-api)
-[![Coverage Status](https://img.shields.io/coveralls/pussinboots/slick-migration-api.svg)](https://coveralls.io/r/pussinboots/slick-migration-api?branch=master)
+[![Build Status](https://travis-ci.org/nafg/slick-migration-api.svg?branch=master)](https://travis-ci.org/nafg/slick-migration-api)
+[![Coverage Status](https://img.shields.io/coveralls/nafg/slick-migration-api.svg)](https://coveralls.io/r/nafg/slick-migration-api?branch=master)
 
 
 A library for defining database migrations, for use with Slick,
