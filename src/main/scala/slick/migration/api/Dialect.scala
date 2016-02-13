@@ -1,21 +1,26 @@
-package scala.slick
-package migration.api
+package slick
+package migration
+package api
 
-import driver._
-import ast.{ FieldSymbol, TableNode }
-import model.ForeignKeyAction
+import slick.driver._
+import slick.ast.FieldSymbol
+import slick.model.ForeignKeyAction
+
+import AstHelpers._
 
 /**
- * Base class for database dialects.
- * Provides methods that return the dialect-specific SQL strings
- * for performing various database operations.
- * The most important method is perhaps [[migrateTable]], which is called from
- * [[TableMigration#sql]].
- * These methods are to be overriden in database-specific subclasses as needed.
- * @tparam D The corresponding Slick driver type.
- *           Not used, but may come in handy in certain situations.
- */
+  * Base class for database dialects.
+  * Provides methods that return the dialect-specific SQL strings
+  * for performing various database operations.
+  * The most important method is perhaps [[migrateTable]], which is called from
+  * [[TableMigration#sql]].
+  * These methods are to be overriden in database-specific subclasses as needed.
+  *
+  * @tparam D The corresponding Slick driver type.
+  *           Not used, but may come in handy in certain situations.
+  */
 class Dialect[-D <: JdbcDriver] extends AstHelpers {
+
   def quoteIdentifier(id: String): String = {
     val s = new StringBuilder(id.length + 4) append '"'
     for (c <- id) if (c == '"') s append "\"\"" else s append c
@@ -50,23 +55,29 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
 
   def createTable(table: TableInfo, columns: Seq[ColumnInfo]): String =
     s"""create table ${quoteTableName(table)} (
-      | ${columns map { columnSql(_, true) } mkString ", "}
-      |)""".stripMargin
+        | ${columns map { columnSql(_, newTable = true) } mkString ", "}
+        |)""".stripMargin
 
   def dropTable(table: TableInfo): String =
     s"drop table ${quoteTableName(table)}"
 
   def renameTable(table: TableInfo, to: String) =
     s"""alter table ${quoteTableName(table)}
-      | rename to ${quoteIdentifier(to)}""".stripMargin
+        | rename to ${quoteIdentifier(to)}""".stripMargin
 
-  def createForeignKey(sourceTable: TableInfo, name: String, sourceColumns: Seq[FieldSymbol], targetTable: TableInfo, targetColumns: Seq[FieldSymbol], onUpdate: ForeignKeyAction, onDelete: ForeignKeyAction): String =
+  def createForeignKey(sourceTable: TableInfo,
+                       name: String,
+                       sourceColumns: Seq[FieldSymbol],
+                       targetTable: TableInfo,
+                       targetColumns: Seq[FieldSymbol],
+                       onUpdate: ForeignKeyAction,
+                       onDelete: ForeignKeyAction): String =
     s"""alter table ${quoteTableName(sourceTable)}
-      | add constraint ${quoteIdentifier(name)}
-      | foreign key ${columnList(sourceColumns)}
-      | references ${quoteTableName(targetTable)}
-      | (${quotedColumnNames(targetColumns) mkString ", "})
-      | on update ${onUpdate.action} on delete ${onDelete.action}""".stripMargin
+        | add constraint ${quoteIdentifier(name)}
+        | foreign key ${columnList(sourceColumns)}
+        | references ${quoteTableName(targetTable)}
+        | (${quotedColumnNames(targetColumns) mkString ", "})
+        | on update ${onUpdate.action} on delete ${onDelete.action}""".stripMargin
 
   def dropConstraint(table: TableInfo, name: String) =
     s"alter table ${quoteTableName(table)} drop constraint ${quoteIdentifier(name)}"
@@ -76,16 +87,16 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
 
   def createPrimaryKey(table: TableInfo, name: String, columns: Seq[FieldSymbol]) =
     s"""alter table ${quoteTableName(table)}
-      | add constraint ${quoteIdentifier(name)} primary key
-      | ${columnList(columns)}""".stripMargin
+        | add constraint ${quoteIdentifier(name)} primary key
+        | ${columnList(columns)}""".stripMargin
 
   def dropPrimaryKey(table: TableInfo, name: String) =
     dropConstraint(table, name)
 
   def createIndex(index: IndexInfo) =
     s"""create ${if (index.unique) "unique" else ""}
-      | index ${quoteIdentifier(index.name)} on ${quoteTableName(tableInfo(index.table))}
-      | ${columnList(index.columns)}""".stripMargin
+        | index ${quoteIdentifier(index.name)} on ${quoteTableName(tableInfo(index.table))}
+        | ${columnList(index.columns)}""".stripMargin
 
   def dropIndex(index: IndexInfo) =
     s"drop index ${quoteIdentifier(index.name)}"
@@ -96,32 +107,32 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
 
   def addColumn(table: TableInfo, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
-      | add column ${columnSql(column, false)}""".stripMargin
+        | add column ${columnSql(column, newTable = false)}""".stripMargin
 
   def dropColumn(table: TableInfo, column: String) =
     s"""alter table ${quoteTableName(table)}
-      | drop column ${quoteIdentifier(column)}""".stripMargin
+        | drop column ${quoteIdentifier(column)}""".stripMargin
 
   def renameColumn(table: TableInfo, from: ColumnInfo, to: String) =
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(from.name)}
-      | rename to ${quoteIdentifier(to)}""".stripMargin
+        | alter column ${quoteIdentifier(from.name)}
+        | rename to ${quoteIdentifier(to)}""".stripMargin
 
   def alterColumnType(table: TableInfo, column: ColumnInfo): Seq[String] = List(
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(column.name)}
-      | set data type ${column.sqlType}""".stripMargin
+        | alter column ${quoteIdentifier(column.name)}
+        | set data type ${column.sqlType}""".stripMargin
   )
 
   def alterColumnDefault(table: TableInfo, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(column.name)}
-      | set default ${column.default getOrElse "null"}""".stripMargin
+        | alter column ${quoteIdentifier(column.name)}
+        | set default ${column.default getOrElse "null"}""".stripMargin
 
   def alterColumnNullability(table: TableInfo, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(column.name)}
-      | ${if (column.notNull) "set" else "drop"} not null""".stripMargin
+        | alter column ${quoteIdentifier(column.name)}
+        | ${if (column.notNull) "set" else "drop"} not null""".stripMargin
 
   /*
    *  DROP | CREATE | RENAME | ACTION
@@ -154,31 +165,31 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
       Seq(createTable(tbl, tmd.columnsCreate))
     } else
       tmd.tableRename.map{ renameTable(table, _) }.toList ++
-      tmd.columnsCreate.map{ addColumn(table, _) }
+        tmd.columnsCreate.map{ addColumn(table, _) }
     val modifyColumns =
       tmd.columnsDrop.map{ c => dropColumn(table, c.name) } ++
-      tmd.columnsRename.map{ case (k, v) => renameColumn(table, k, v) } ++
-      tmd.columnsAlterType.flatMap{ alterColumnType(table, _) } ++
-      tmd.columnsAlterDefault.map{ alterColumnDefault(table, _) } ++
-      tmd.columnsAlterNullability.map{ alterColumnNullability(table, _) }
+        tmd.columnsRename.map{ case (k, v) => renameColumn(table, k, v) } ++
+        tmd.columnsAlterType.flatMap{ alterColumnType(table, _) } ++
+        tmd.columnsAlterDefault.map{ alterColumnDefault(table, _) } ++
+        tmd.columnsAlterNullability.map{ alterColumnNullability(table, _) }
     val migrateIndexes =
       tmd.primaryKeysDrop.map{ pk => dropPrimaryKey(table, pk._1) } ++
-      tmd.primaryKeysCreate.map{ case (name, cols) => createPrimaryKey(table, name, cols) } ++
-      tmd.foreignKeysDrop.map{ fk => dropForeignKey(table, fk.name) } ++
-      tmd.foreignKeysCreate.map{ fk =>
-        createForeignKey(
-          table,
-          fk.name,
-          fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq),
-          tableInfo(fk.targetTable),
-          fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym(_).toSeq),
-          fk.onUpdate,
-          fk.onDelete
-        )
-      } ++
-      tmd.indexesDrop.map{ dropIndex } ++
-      tmd.indexesCreate.map{ createIndex } ++
-      tmd.indexesRename.flatMap{ case (k, v) => renameIndex(k, v) }
+        tmd.primaryKeysCreate.map{ case (name, cols) => createPrimaryKey(table, name, cols) } ++
+        tmd.foreignKeysDrop.map{ fk => dropForeignKey(table, fk.name) } ++
+        tmd.foreignKeysCreate.map{ fk =>
+          createForeignKey(
+            table,
+            fk.name,
+            fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq),
+            tableInfo(fk.targetTable),
+            fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym(_).toSeq),
+            fk.onUpdate,
+            fk.onDelete
+          )
+        } ++
+        tmd.indexesDrop.map{ dropIndex } ++
+        tmd.indexesCreate.map{ createIndex } ++
+        tmd.indexesRename.flatMap{ case (k, v) => renameIndex(k, v) }
 
     drop ++
       createColumns ++
@@ -207,8 +218,8 @@ class DerbyDialect extends Dialect[DerbyDriver] {
 
   override def alterColumnNullability(table: TableInfo, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(column.name)}
-      | ${if (column.notNull) "not" else ""} null""".stripMargin
+        | alter column ${quoteIdentifier(column.name)}
+        | ${if (column.notNull) "not" else ""} null""".stripMargin
 
   override def renameTable(table: TableInfo, to: String) =
     s"rename table ${quoteTableName(table)} to ${quoteIdentifier(to)}"
@@ -224,11 +235,12 @@ class H2Dialect extends Dialect[H2Driver] {
   override def autoInc(ci: ColumnInfo) = ""
 }
 
-trait SimulatedRenameIndex { this: Dialect[_] =>
-  override def renameIndex(old: IndexInfo, newName: String) =
+trait SimulatedRenameIndex[T <: JdbcDriver] { this: Dialect[T] =>
+  override def renameIndex(old: IndexInfo, newName: String): Seq[String] =
     List(dropIndex(old), createIndex(old.copy(name = newName)))
 }
-class SQLiteDialect extends Dialect[SQLiteDriver] with SimulatedRenameIndex {
+
+class SQLiteDialect extends Dialect[SQLiteDriver] with SimulatedRenameIndex[SQLiteDriver] {
   override def columnType(ci: ColumnInfo): String =
     if (ci.autoInc) "INTEGER" else ci.sqlType
 }
@@ -242,7 +254,7 @@ class HsqldbDialect extends Dialect[HsqldbDriver] {
     if (ci.notNull && !ci.isPk) " NOT NULL" else ""
 }
 
-class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex {
+class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex[MySQLDriver] {
   override def autoInc(ci: ColumnInfo) = if(ci.autoInc) " AUTO_INCREMENT" else ""
 
   override def quoteIdentifier(id: String): String = {
@@ -257,8 +269,8 @@ class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex {
   override def renameColumn(table: TableInfo, from: ColumnInfo, to: String) = {
     val newCol = from.copy(name = to)
     s"""alter table ${quoteTableName(table)}
-      | change ${quoteIdentifier(from.name)}
-      | ${columnSql(newCol, false)}""".stripMargin
+        | change ${quoteIdentifier(from.name)}
+        | ${columnSql(newCol, newTable = false)}""".stripMargin
   }
 
   override def alterColumnNullability(table: TableInfo, column: ColumnInfo) =
@@ -272,8 +284,8 @@ class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex {
 
   override def createPrimaryKey(table: TableInfo, name: String, columns: Seq[FieldSymbol]) =
     s"""alter table ${quoteTableName(table)}
-      | add constraint primary key
-      | ${columnList(columns)}""".stripMargin
+        | add constraint primary key
+        | ${columnList(columns)}""".stripMargin
   override def dropPrimaryKey(table: TableInfo, name: String) =
     s"alter table ${quoteTableName(table)} drop primary key"
 }
@@ -284,6 +296,20 @@ class PostgresDialect extends Dialect[PostgresDriver] {
   override def autoInc(ci: ColumnInfo) = ""
   override def renameColumn(table: TableInfo, from: ColumnInfo, to: String) =
     s"""alter table ${quoteTableName(table)}
-      | rename column ${quoteIdentifier(from.name)}
-      | to ${quoteIdentifier(to)}""".stripMargin
+        | rename column ${quoteIdentifier(from.name)}
+        | to ${quoteIdentifier(to)}""".stripMargin
+}
+
+object GenericDialect {
+
+  def apply(driver: JdbcDriver): Dialect[_ <: JdbcDriver] = driver match {
+    case DerbyDriver    => new DerbyDialect
+    case H2Driver       => new H2Dialect
+    case SQLiteDriver   => new SQLiteDialect
+    case HsqldbDriver   => new HsqldbDialect
+    case MySQLDriver    => new MySQLDialect
+    case PostgresDriver => new PostgresDialect
+    case _ =>
+      throw new IllegalArgumentException("Slick error : Unknown or unsupported jdbc driver found.")
+  }
 }
