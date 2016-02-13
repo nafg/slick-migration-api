@@ -1,9 +1,14 @@
-package scala.slick
+package slick
 package migration.api
 
-import scala.slick.driver.JdbcDriver
-import scala.slick.ast.{ FieldSymbol, Node, TableNode }
-import scala.slick.lifted.{ AbstractTable, Column, ForeignKey, ForeignKeyQuery, Index, PrimaryKey, TableQuery }
+import slick.ast.FieldSymbol
+import slick.dbio.DBIO
+import slick.driver.JdbcDriver
+import slick.jdbc.{ SQLActionBuilder, SetParameter }
+import slick.jdbc.GetResult._
+import slick.lifted.{ AbstractTable, Rep, ForeignKey, ForeignKeyQuery, Index, PrimaryKey, TableQuery }
+
+import AstHelpers._
 
 /**
  * Internal data structure that stores schema manipulation operations to be performed on a table
@@ -123,13 +128,18 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
 
   def tableInfo = TableInfo(table.schemaName, table.tableName)
 
-  def sql = dialect.migrateTable(tableInfo, data)
+  /**
+   * The SQL statements to run
+   */
+  override def actions: Seq[DBIO[_]] = dialect.migrateTable(tableInfo, data).map { statement =>
+    new SQLActionBuilder(Seq(statement), SetParameter.SetUnit).as[Int]
+  }
 
   protected[api] def data: TableMigrationData
 
   protected def withData(data: TableMigrationData): Self
 
-  private def colInfo(f: T => Column[_]): ColumnInfo = {
+  private def colInfo(f: T => Rep[_]): ColumnInfo = {
     val col = f(table)
     fieldSym(col.toNode) match {
       case Some(c) =>
@@ -180,7 +190,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.addColumns(_.col1, _.col2, _.column[Int]("fieldNotYetInTableDef")) }}}
    * @group oper
    */
-  def addColumns(cols: (T => Column[_])*) = withData(data.copy(
+  def addColumns(cols: (T => Rep[_])*) = withData(data.copy(
     columnsCreate = data.columnsCreate ++
       cols.map(colInfo)
   ))
@@ -191,7 +201,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.dropColumns(_.col1, _.col2, _.column[Int]("oldFieldNotInTableDef")) }}}
    * @group oper
    */
-  def dropColumns(cols: (T => Column[_])*) = withData(data.copy(
+  def dropColumns(cols: (T => Rep[_])*) = withData(data.copy(
     columnsDrop = data.columnsDrop ++
       cols.map(colInfo)
   ))
@@ -202,7 +212,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.renameColumns(_.col1, "newName") }}}
    * @group oper
    */
-  def renameColumn(col: T => Column[_], to: String) = withData(data.copy(
+  def renameColumn(col: T => Rep[_], to: String) = withData(data.copy(
     columnsRename = data.columnsRename +
       (colInfo(col) -> to)
   ))
@@ -213,7 +223,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.alterColumnTypes(_.col1, _.column[NotTheTypeInTableDef]("col2")) }}}
    * @group oper
    */
-  def alterColumnTypes(cols: (T => Column[_])*) = new IrreversibleTableMigration(
+  def alterColumnTypes(cols: (T => Rep[_])*) = new IrreversibleTableMigration(
     table,
     tableInfo,
     data.copy(
@@ -228,7 +238,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.alterColumnDefaults(_.col1, _.column[Int]("col2", O.Default("notTheDefaultInTableDef"))) }}}
    * @group oper
    */
-  def alterColumnDefaults(cols: (T => Column[_])*) = new IrreversibleTableMigration(
+  def alterColumnDefaults(cols: (T => Rep[_])*) = new IrreversibleTableMigration(
     table,
     tableInfo,
     data.copy(
@@ -243,7 +253,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
    * @example {{{ tblMig.alterColumnNulls(_.col1, _.column[Int]("col2", O.NotNull)) }}}
    * @group oper
    */
-  def alterColumnNulls(cols: (T => Column[_])*) = new IrreversibleTableMigration(
+  def alterColumnNulls(cols: (T => Rep[_])*) = new IrreversibleTableMigration(
     table,
     tableInfo,
     data.copy(
@@ -262,7 +272,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     primaryKeysCreate = data.primaryKeysCreate ++
       pks.map { f =>
         val key = f(table)
-        (key.name, key.columns flatMap (fieldSym(_)))
+        (key.name, key.columns.flatMap(node => fieldSym(node)))
       }
   ))
 
@@ -276,7 +286,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     primaryKeysDrop = data.primaryKeysDrop ++
       pks.map { f =>
         val key = f(table)
-        (key.name, key.columns flatMap (fieldSym(_)))
+        (key.name, key.columns.flatMap(node => fieldSym(node)))
       }
   ))
 
@@ -351,7 +361,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
 
   override def equals(a: Any) = a match {
     case that: TableMigration[_] if that canEqual this =>
-      (that.tableInfo, that.data) == (this.tableInfo, this.data)
+      that.tableInfo == this.tableInfo && that.data == this.data
     case _ => false
   }
   override def toString = s"TableMigration{${data.toString}}"
@@ -377,7 +387,7 @@ final class ReversibleTableMigration[T <: JdbcDriver#Table[_]] private[api](tabl
    * This should be redundant since the constructor is private[api] and should only be called
    * when these requirements are known to hold.
    */
-  require(data.tableDrop == false)
+  require(!data.tableDrop)
   require(data.columnsAlterType.isEmpty)
   require(data.columnsAlterDefault.isEmpty)
   require(data.columnsAlterNullability.isEmpty)

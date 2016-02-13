@@ -1,9 +1,11 @@
-package scala.slick
+package slick
 package migration.api
 
-import driver._
-import ast.{ FieldSymbol, TableNode }
-import model.ForeignKeyAction
+import slick.driver._
+import slick.ast.FieldSymbol
+import slick.model.ForeignKeyAction
+
+import AstHelpers._
 
 /**
  * Base class for database dialects.
@@ -16,6 +18,7 @@ import model.ForeignKeyAction
  *           Not used, but may come in handy in certain situations.
  */
 class Dialect[-D <: JdbcDriver] extends AstHelpers {
+
   def quoteIdentifier(id: String): String = {
     val s = new StringBuilder(id.length + 4) append '"'
     for (c <- id) if (c == '"') s append "\"\"" else s append c
@@ -50,7 +53,7 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
 
   def createTable(table: TableInfo, columns: Seq[ColumnInfo]): String =
     s"""create table ${quoteTableName(table)} (
-      | ${columns map { columnSql(_, true) } mkString ", "}
+      | ${columns map { columnSql(_, newTable = true) } mkString ", "}
       |)""".stripMargin
 
   def dropTable(table: TableInfo): String =
@@ -96,7 +99,7 @@ class Dialect[-D <: JdbcDriver] extends AstHelpers {
 
   def addColumn(table: TableInfo, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
-      | add column ${columnSql(column, false)}""".stripMargin
+      | add column ${columnSql(column, newTable = false)}""".stripMargin
 
   def dropColumn(table: TableInfo, column: String) =
     s"""alter table ${quoteTableName(table)}
@@ -224,11 +227,12 @@ class H2Dialect extends Dialect[H2Driver] {
   override def autoInc(ci: ColumnInfo) = ""
 }
 
-trait SimulatedRenameIndex { this: Dialect[_] =>
-  override def renameIndex(old: IndexInfo, newName: String) =
+trait SimulatedRenameIndex[T <: JdbcDriver] { this: Dialect[T] =>
+  override def renameIndex(old: IndexInfo, newName: String): Seq[String] =
     List(dropIndex(old), createIndex(old.copy(name = newName)))
 }
-class SQLiteDialect extends Dialect[SQLiteDriver] with SimulatedRenameIndex {
+
+class SQLiteDialect extends Dialect[SQLiteDriver] with SimulatedRenameIndex[SQLiteDriver] {
   override def columnType(ci: ColumnInfo): String =
     if (ci.autoInc) "INTEGER" else ci.sqlType
 }
@@ -242,7 +246,7 @@ class HsqldbDialect extends Dialect[HsqldbDriver] {
     if (ci.notNull && !ci.isPk) " NOT NULL" else ""
 }
 
-class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex {
+class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex[MySQLDriver] {
   override def autoInc(ci: ColumnInfo) = if(ci.autoInc) " AUTO_INCREMENT" else ""
 
   override def quoteIdentifier(id: String): String = {
@@ -258,7 +262,7 @@ class MySQLDialect extends Dialect[MySQLDriver] with SimulatedRenameIndex {
     val newCol = from.copy(name = to)
     s"""alter table ${quoteTableName(table)}
       | change ${quoteIdentifier(from.name)}
-      | ${columnSql(newCol, false)}""".stripMargin
+      | ${columnSql(newCol, newTable = false)}""".stripMargin
   }
 
   override def alterColumnNullability(table: TableInfo, column: ColumnInfo) =
@@ -286,4 +290,18 @@ class PostgresDialect extends Dialect[PostgresDriver] {
     s"""alter table ${quoteTableName(table)}
       | rename column ${quoteIdentifier(from.name)}
       | to ${quoteIdentifier(to)}""".stripMargin
+}
+
+object GenericDialect {
+
+  def apply(driver: JdbcDriver): Dialect[_ <: JdbcDriver] = driver match {
+    case DerbyDriver    => new DerbyDialect
+    case H2Driver       => new H2Dialect
+    case SQLiteDriver   => new SQLiteDialect
+    case HsqldbDriver   => new HsqldbDialect
+    case MySQLDriver    => new MySQLDialect
+    case PostgresDriver => new PostgresDialect
+    case _ =>
+      throw new IllegalArgumentException("Slick error : Unknown or unsupported jdbc driver found.")
+  }
 }
