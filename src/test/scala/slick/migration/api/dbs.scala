@@ -58,7 +58,7 @@ class SqliteTest extends DbTest[SQLiteDriver](new SQLiteTestDB("jdbc:sqlite::mem
   override def getTables(implicit session: JdbcBackend#Session) =
     super.getTables.filterNot(t =>
       t.name.name == "sqlite_sequence" ||
-        t.name.name.startsWith("sqlite_autoindex_")
+      t.name.name.startsWith("sqlite_autoindex_")
     )
   override def longJdbcType = java.sql.Types.INTEGER
 }

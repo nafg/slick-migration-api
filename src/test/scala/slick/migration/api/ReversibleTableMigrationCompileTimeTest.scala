@@ -1,7 +1,7 @@
 package slick
 package migration.api
 
-import driver.H2Driver
+import slick.driver.H2Driver
 
 object ReversibleTableMigrationCompileTimeTest {
   implicit val dialect = new H2Dialect

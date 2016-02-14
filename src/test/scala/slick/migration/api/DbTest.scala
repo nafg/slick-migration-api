@@ -1,6 +1,5 @@
 package slick
-package migration
-package api
+package migration.api
 
 import java.sql.{ SQLException, Types }
 
@@ -11,12 +10,11 @@ import org.scalatest.{ BeforeAndAfterAll, FunSuite, Inside, Matchers }
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
 
-abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })
-                                      (implicit protected val dialect: Dialect[D])
+abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(implicit protected val dialect: Dialect[D])
   extends FunSuite
-    with Matchers
-    with Inside
-    with BeforeAndAfterAll {
+  with Matchers
+  with Inside
+  with BeforeAndAfterAll {
 
   implicit lazy val session = tdb.createDB.createSession
 
@@ -42,8 +40,8 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })
   def longJdbcType = Types.BIGINT
 
   /**
-    * How JDBC metadata returns a column's default string value
-    */
+   * How JDBC metadata returns a column's default string value
+   */
   def columnDefaultFormat(s: String) = s"'$s'"
 
   test("create, drop") {
