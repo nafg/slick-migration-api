@@ -2,18 +2,15 @@ package slick
 package migration.api
 
 import java.sql.SQLException
-import java.util.logging.{ Level, Logger }
-
-import slick.driver._
-import slick.jdbc.{ StaticQuery => Q, JdbcBackend, ResultSetAction, ResultSetInvoker, SimpleJdbcAction }
-import slick.jdbc.GetResult._
-
-import com.typesafe.slick.testkit.util.JdbcTestDB
-import com.typesafe.slick.testkit.util.InternalJdbcTestDB
-import com.typesafe.slick.testkit.util.ExternalJdbcTestDB
-import com.typesafe.slick.testkit.util.TestDB
+import java.util.logging.{Level, Logger}
 
 import scala.concurrent.ExecutionContext
+
+import slick.driver._
+import slick.jdbc.GetResult._
+import slick.jdbc.{JdbcBackend, ResultSetAction, SimpleJdbcAction}
+
+import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
 
 object Dialects {
   implicit def derby   : Dialect[DerbyDriver   ] = new DerbyDialect
@@ -24,7 +21,7 @@ object Dialects {
   implicit def postgres: Dialect[PostgresDriver] = new PostgresDialect
 }
 
-import Dialects._
+import slick.migration.api.Dialects._
 
 trait DialectTestDB { this: JdbcTestDB =>
   type Drv <: JdbcDriver
@@ -40,6 +37,7 @@ class H2TestDB(name: String) extends InternalJdbcTestDB(name) with DialectTestDB
 
 class H2Test extends DbTest(new H2TestDB("h2mem")) with CompleteDbTest {
   override def noActionReturns = slick.model.ForeignKeyAction.Restrict
+  override def longJdbcType = java.sql.Types.INTEGER
 }
 
 class HsqldbTest extends DbTest(new HsqlDB("hsqldbmem") {
@@ -93,10 +91,10 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
     val tables = ResultSetAction[(String,String,String, String)](_.conn.getMetaData.getTables("", "public", null, null))
     tables.map(_.filter(_._4.toUpperCase == "TABLE").map(_._3).sorted)
   }
-  override def getLocalSequences(implicit session: profile.Backend#Session) = {
-    val tables = ResultSetInvoker[(String,String,String, String)](_.conn.getMetaData.getTables("", "public", null, null))
-    tables.buildColl[List].filter(_._4.toUpperCase == "SEQUENCE").map(_._3).sorted
-  }
+  override def localSequences(implicit ec: ExecutionContext) =
+    ResultSetAction[(String, String, String, String)](_.conn.getMetaData.getTables("", "public", null, null)).map { ts =>
+      ts.filter(_._4.toUpperCase == "SEQUENCE").map(_._3).sorted
+    }
   override lazy val capabilities = driver.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
   override val schema = Some("public")
@@ -134,12 +132,6 @@ class SQLiteTestDB(dburl: String, confName: String) extends InternalJdbcTestDB(c
   val jdbcDriver = "org.sqlite.JDBC"
   override def localTables(implicit ec: ExecutionContext) =
     super.localTables.map(_.filter(s => !s.toLowerCase.contains("sqlite_")))
-  override def dropUserArtifacts(implicit session: profile.Backend#Session) = {
-    for(t <- getLocalTables)
-      (Q.u+"drop table if exists "+driver.quoteIdentifier(t)).execute
-    for(t <- getLocalSequences)
-      (Q.u+"drop sequence if exists "+driver.quoteIdentifier(t)).execute
-  }
   override lazy val capabilities = driver.capabilities + TestDB.capabilities.plainSql
 }
 
@@ -150,28 +142,6 @@ abstract class DerbyDB(confName: String) extends InternalJdbcTestDB(confName) {
   override def localTables(implicit ec: ExecutionContext) = {
     val tables = ResultSetAction[(String,String,String)](_.conn.getMetaData.getTables(null, "APP", null, null))
     tables.map(_.map(_._3).sorted)
-  }
-  override def dropUserArtifacts(implicit session: profile.Backend#Session) = {
-    try {
-      try { (Q.u+"create table \"__derby_dummy\"(x integer primary key)").execute }
-      catch { case ignore: SQLException => }
-      val constraints = (Q[(String, String)]+"""
-            select c.constraintname, t.tablename
-            from sys.sysconstraints c, sys.sysschemas s, sys.systables t
-            where c.schemaid = s.schemaid and c.tableid = t.tableid and s.schemaname = 'APP'
-                                             """).buildColl[List]
-      for((c, t) <- constraints if !c.startsWith("SQL"))
-        (Q.u+"alter table "+driver.quoteIdentifier(t)+" drop constraint "+driver.quoteIdentifier(c)).execute
-      for(t <- getLocalTables)
-        (Q.u+"drop table "+driver.quoteIdentifier(t)).execute
-      for(t <- getLocalSequences)
-        (Q.u+"drop sequence "+driver.quoteIdentifier(t)).execute
-    } catch {
-      case e: Exception =>
-        println("[Caught Exception while dropping user artifacts in Derby: "+e+"]")
-        session.close()
-        cleanUpBefore()
-    }
   }
   override lazy val capabilities = driver.capabilities + TestDB.capabilities.plainSql
 }

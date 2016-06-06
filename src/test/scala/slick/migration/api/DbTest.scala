@@ -1,14 +1,14 @@
 package slick
 package migration.api
 
-import java.sql.{ SQLException, Types }
+import java.sql.{SQLException, Types}
 
+import slick.driver.JdbcDriver
 import slick.jdbc.JdbcBackend
-import slick.jdbc.meta.{ MIndexInfo, MPrimaryKey, MQName, MTable }
-import driver.JdbcDriver
-import org.scalatest.{ BeforeAndAfterAll, FunSuite, Inside, Matchers }
+import slick.jdbc.meta.{MIndexInfo, MPrimaryKey, MQName, MTable}
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Inside, Matchers}
 
 abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(implicit protected val dialect: Dialect[D])
   extends FunSuite

@@ -85,7 +85,7 @@ private [api] trait AstHelpers {
 
         val initial = ColumnInfo(
           name = column.name,
-          sqlType = ti.sqlTypeName(column.options.collectFirst{case len: RColumnOption.Length => len}),
+          sqlType = ti.sqlTypeName(Some(column)),
           notNull = !(isOpt || ti.scalaType.nullable),
           autoInc = false,
           isPk = false,
