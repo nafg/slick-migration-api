@@ -1,19 +1,15 @@
 package slick
 package migration.api
 
-import slick.dbio.{ FailureAction, SuccessAction, DBIO }
-import slick.jdbc.JdbcBackend
-import slick.profile.SqlAction
-
-import scala.concurrent.{ ExecutionContext, Future }
+import slick.dbio._
+import slick.jdbc.SimpleJdbcAction
 
 /**
  * The base of the migration type hierarchy.
- * Can contain any operation that can use an implicit `Session`.
+ * Produces a DBIO that runs the migration
  */
 trait Migration {
-  def run(db: JdbcBackend#Database)(implicit ec: ExecutionContext): Future[Unit]
-  def statements: Seq[String] = Seq("-- No-SQL action --")
+  def apply(): DBIO[Unit]
 }
 
 object Migration {
@@ -35,12 +31,8 @@ object Migration {
     def &[N <: Migration, O](n: N)(implicit ccm: CanConcatMigrations[M, N, O]): O = ccm.f(m, n)
   }
 
-  def failure: Migration = new SqlMigration {
-    override def actions: Seq[DBIO[_]] = Seq(FailureAction(new Exception("Aborted.")))
-  }
-
-  def successful: Migration = new SqlMigration {
-    override val actions: Seq[DBIO[_]] = Seq(SuccessAction(()))
+  def empty: Migration = new Migration {
+    override def apply() = DBIO.successful(())
   }
 }
 
@@ -79,13 +71,7 @@ object CanConcatMigrations extends CanConcatMigrationsLow {
  * Holds a sequence of [[Migration]]s and performs them one after the other.
  */
 case class MigrationSeq(migrations: Migration*) extends Migration {
-
-  final override def run(db: JdbcBackend#Database)(implicit ec: ExecutionContext): Future[Unit] =
-    (migrations :+ Migration.successful).foldLeft(Future.successful(())){ case(f, m) =>
-      f.flatMap(_ => m.run(db))
-    }
-
-  final override def statements: Seq[String] = migrations.flatMap(_.statements)
+  final def apply() = DBIO.seq(migrations.map(_()): _*)
 }
 
 /**
@@ -101,27 +87,23 @@ class ReversibleMigrationSeq(override val migrations: ReversibleMigration*) exte
 
 /**
  * A [[Migration]] defined in terms of SQL commands.
- * This trait implements `run` and instead defines an
- * abstract `actions` method.
+ * This trait implements `apply` and instead defines an
+ * abstract [[sql]] method.
  */
 trait SqlMigration extends Migration {
   /**
    * The SQL statements to run
    */
-  def actions: Seq[DBIO[_]]
+  def sql: Seq[String]
 
-  def seq: DBIO[Unit] = DBIO.seq(actions: _*)
-
-  override def statements: Seq[String] = actions.collect {
-    case sql: SqlAction[_, _, _] => sql.statements
-    case _ => super.statements
-  }.flatten
-
-  /**
-   * Runs all the SQL statements in a single transaction
-   */
-  override def run(db: JdbcBackend#Database)(implicit ec: ExecutionContext): Future[Unit] =
-    db.run(DBIO.seq(actions: _*))
+  def apply() = SimpleJdbcAction { ctx =>
+    for(str <- sql)
+      try ctx.session.withPreparedStatement(str)(_.execute())
+      catch {
+        case e: java.sql.SQLException =>
+          throw MigrationException(s"Could not execute sql: '$str'", e)
+      }
+  }
 }
 
 //TODO mechanism other than exceptions?
@@ -132,10 +114,10 @@ case class MigrationException(message: String, cause: Throwable) extends Runtime
  * @example {{{ SqlMigration("drop table t1", "update t2 set x=10 where y=20") }}}
  */
 object SqlMigration {
-  def apply(actions: DBIO[_]*) = {
-    def actions0 = actions
+  def apply(sql: String*) = {
+    def sql0 = sql
     new SqlMigration {
-      override val actions: Seq[DBIO[_]] = actions0
+      override val sql = sql0
     }
   }
 }
