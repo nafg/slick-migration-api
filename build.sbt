@@ -26,4 +26,6 @@ libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.6.4" 
 
 scalacOptions in (Compile, doc) ++= Seq("-groups", "-implicits")
 
+scalacOptions ++= Seq("-feature", "-deprecation")
+
 testOptions in Test += Tests.Argument("-oF")
