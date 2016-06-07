@@ -4,7 +4,7 @@
 
 | Slick version | SBT dependency                                        |
 |---------------|-------------------------------------------------------|
-| 3.1.1         | `"io.github.nafg" %% "slick-migration-api" % "0.2.1"` |
+| 3.1.1         | `"io.github.nafg" %% "slick-migration-api" % "0.3.0"` |
 | 3.0.3         | `"io.github.nafg" %% "slick-migration-api" % "0.2.0"` |
 | 2.1.0         | `"io.github.nafg" %% "slick-migration-api" % "0.1.1"` |
 
@@ -17,15 +17,16 @@ Example:
 ````scala
 implicit val dialect = new H2Dialect
 
-val migrate =
+val init =
   TableMigration(myTable)
     .create
     .addColumns(_.col1, _.col2)
     .addIndexes(_.index1)
-    .renameColumn(_.col03, "col3") &
+    .renameColumn(_.col03, "col3")
+val seed =
   SqlMigration("insert into myTable (col1, col2) values (10, 20)")
+  
+val migration = init & seed
 
-withSession { implicit session: Session =>
-  migrate()
-}
+db.run(migration())
 ````
