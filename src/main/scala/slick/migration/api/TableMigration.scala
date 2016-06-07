@@ -2,13 +2,9 @@ package slick
 package migration.api
 
 import slick.ast.FieldSymbol
-import slick.dbio.DBIO
 import slick.driver.JdbcDriver
-import slick.jdbc.{ SQLActionBuilder, SetParameter }
-import slick.jdbc.GetResult._
-import slick.lifted.{ AbstractTable, Rep, ForeignKey, ForeignKeyQuery, Index, PrimaryKey, TableQuery }
-
-import AstHelpers._
+import slick.lifted._
+import slick.migration.api.AstHelpers._
 
 /**
  * Internal data structure that stores schema manipulation operations to be performed on a table
@@ -128,12 +124,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
 
   def tableInfo = TableInfo(table.schemaName, table.tableName)
 
-  /**
-   * The SQL statements to run
-   */
-  override def actions: Seq[DBIO[_]] = dialect.migrateTable(tableInfo, data).map { statement =>
-    new SQLActionBuilder(Seq(statement), SetParameter.SetUnit).as[Int]
-  }
+  def sql = dialect.migrateTable(tableInfo, data)
 
   protected[api] def data: TableMigrationData
 

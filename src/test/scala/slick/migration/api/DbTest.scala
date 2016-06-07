@@ -57,7 +57,7 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
     val tm = TableMigration(table1)
     val createTable = tm.create.addColumns(_.id, _.col1)
 
-    tdb.blockingRunOnSession(implicit ec => createTable.seq)
+    tdb.blockingRunOnSession(implicit ec => createTable())
 
     try {
       val after = getTables
@@ -78,7 +78,7 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
       tm.create.reverse should equal (tm.drop)
 
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
 
     getTables should equal (before)
   }
@@ -93,7 +93,7 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
     val table5 = TableQuery[Table5]
 
     val tm = TableMigration(table5)
-    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1).seq)
+    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1)())
 
     def columnsCount = getTable("table5").map { table =>
       tdb.blockingRunOnSession(implicit ec => table.getColumns).length
@@ -105,11 +105,11 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
       val addColumn = tm.addColumns(_.col2, _.col3)
       addColumn.reverse should equal (tm.dropColumns(_.col3, _.col2))
 
-      tdb.blockingRunOnSession(implicit ec => addColumn.seq)
+      tdb.blockingRunOnSession(implicit ec => addColumn())
 
       columnsCount should equal (Some(3))
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
   }
 
   test("addIndexes, dropIndexes") {
@@ -138,23 +138,23 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
 
     val tm = TableMigration(table4)
     tdb.blockingRunOnSession { implicit ec =>
-      tm.create.addColumns(_.id, _.col1, _.col2, _.col3).seq
+      tm.create.addColumns(_.id, _.col1, _.col2, _.col3)()
     }
 
     try {
       val createIndexes = tm.addIndexes(_.index1, _.index2)
-      tdb.blockingRunOnSession(implicit ec => createIndexes.seq)
+      tdb.blockingRunOnSession(implicit ec => createIndexes())
 
       indexes(Some("index1") -> false) should equal (Vector((1, Some("col1"))))
       indexes(Some("index2") -> true) should equal (Vector((1, Some("col2")), (2, Some("col3"))))
 
       createIndexes.reverse should equal (tm.dropIndexes(_.index2, _.index1))
 
-      tdb.blockingRunOnSession(implicit ec => createIndexes.reverse.seq)
+      tdb.blockingRunOnSession(implicit ec => createIndexes.reverse())
 
       indexes.keys.flatMap(_._1).exists(Set("index1", "index2")) should equal (false)
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
   }
 
   test("rename, renameIndex") {
@@ -170,7 +170,7 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
 
     val tm = TableMigration(oldname)
     tdb.blockingRunOnSession { implicit ec =>
-      tm.create.addColumns(_.col1).addIndexes(_.index1).seq
+      tm.create.addColumns(_.col1).addIndexes(_.index1)()
     }
 
     def tables = getTables.map(_.name.name).filterNot(_ == "oldIndexName")
@@ -183,17 +183,17 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
     tables should equal (Vector("oldname"))
     indexes should equal (Vector("oldIndexName"))
 
-    tdb.blockingRunOnSession(implicit ec => tm.rename("table7").seq)
+    tdb.blockingRunOnSession(implicit ec => tm.rename("table7")())
     tables should equal (Vector("table7"))
 
     val tm7 = TableMigration(table7)
     try {
       tdb.blockingRunOnSession { implicit ec =>
-        tm7.renameIndex(_.index1, "index1").seq
+        tm7.renameIndex(_.index1, "index1")()
       }
       indexes should equal (Vector("index1"))
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm7.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm7.drop())
 
     tm.rename("table7").reverse should equal (tm7.rename("oldname"))
   }
@@ -222,7 +222,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
 
     val tm = TableMigration(table8)
     tdb.blockingRunOnSession {
-      implicit ec => tm.create.addColumns(_.id, _.stringId).seq
+      implicit ec => tm.create.addColumns(_.id, _.stringId)()
     }
 
     val before = pks
@@ -230,17 +230,17 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     before.get(Some("PRIMARY")) should equal (None)
 
     try {
-      tdb.blockingRunOnSession(implicit ec => tm.addPrimaryKeys(_.pk).seq)
+      tdb.blockingRunOnSession(implicit ec => tm.addPrimaryKeys(_.pk)())
 
       pks(Some("PRIMARY")) should equal (Vector(1 -> "id", 2 -> "stringId"))
 
       tm.addPrimaryKeys(_.pk).reverse should equal (tm.dropPrimaryKeys(_.pk))
 
-      tdb.blockingRunOnSession(implicit ec => tm.dropPrimaryKeys(_.pk).seq)
+      tdb.blockingRunOnSession(implicit ec => tm.dropPrimaryKeys(_.pk)())
 
       pks should equal (before)
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
   }
 
   test("addForeignKeys, dropForeignKeys") {
@@ -262,8 +262,8 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     val tm2 = TableMigration(table2)
     val tm3 = TableMigration(table3)
     try {
-      tdb.blockingRunOnSession(implicit ec => tm2.create.addColumns(_.id, _.other).seq)
-      tdb.blockingRunOnSession(implicit ec => tm3.create.addColumns(_.id).seq)
+      tdb.blockingRunOnSession(implicit ec => tm2.create.addColumns(_.id, _.other)())
+      tdb.blockingRunOnSession(implicit ec => tm3.create.addColumns(_.id)())
 
       def fks = getTables.to[Set] map { t =>
         (
@@ -282,7 +282,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
       ))
 
       val createForeignKey = tm2.addForeignKeys(_.fk)
-      tdb.blockingRunOnSession(implicit ec => createForeignKey.seq)
+      tdb.blockingRunOnSession(implicit ec => createForeignKey())
 
       fks should equal (Set(
         ("table2", Vector.empty),
@@ -294,12 +294,12 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
       dropForeignKey.data.foreignKeysDrop.toList should equal (table2.baseTableRow.fk.fks.toList)
       dropForeignKey should equal (tm2.dropForeignKeys(_.fk))
 
-      tdb.blockingRunOnSession(implicit ec => dropForeignKey.seq)
+      tdb.blockingRunOnSession(implicit ec => dropForeignKey())
 
       fks should equal (before)
     } finally {
-      tdb.blockingRunOnSession(implicit ec => tm2.drop.seq)
-      tdb.blockingRunOnSession(implicit ec => tm3.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm2.drop())
+      tdb.blockingRunOnSession(implicit ec => tm3.drop())
     }
   }
 
@@ -312,7 +312,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     val table11 = TableQuery[Table11]
 
     val tm = TableMigration(table11)
-    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1, _.col2).seq)
+    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1, _.col2)())
 
     def columnsCount = getTable("table11").map { table =>
       tdb.blockingRunOnSession(implicit e => table.getColumns).length
@@ -321,11 +321,11 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     try {
       columnsCount should equal (Some(2))
 
-      tdb.blockingRunOnSession(implicit ec => tm.dropColumns(_.col2).seq)
+      tdb.blockingRunOnSession(implicit ec => tm.dropColumns(_.col2)())
 
       columnsCount should equal (Some(1))
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
 
     tm.addColumns(_.col1, _.col2).reverse should equal (tm.dropColumns(_.col2, _.col1))
   }
@@ -339,7 +339,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     val table6 = TableQuery[Table6]
 
     val tm = TableMigration(table6)
-    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.tmpOldId).seq)
+    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.tmpOldId)())
 
     def columnTypes = getTable("table6").map { table =>
       tdb.blockingRunOnSession(implicit e => table.getColumns).map(_.sqlType)
@@ -347,10 +347,10 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
 
     try {
       columnTypes should equal (Vector(Types.DATE))
-      tdb.blockingRunOnSession(implicit ec => tm.alterColumnTypes(_.id).seq)
+      tdb.blockingRunOnSession(implicit ec => tm.alterColumnTypes(_.id)())
       columnTypes should equal (Vector(Types.VARCHAR))
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
   }
 
   test("alterColumnDefaults") {
@@ -362,7 +362,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     val table9 = TableQuery[Table9]
 
     val tm = TableMigration(table9)
-    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.tmpOldId).seq)
+    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.tmpOldId)())
 
     def columns = getTable("table9").map { table =>
       tdb.blockingRunOnSession(implicit e => table.getColumns).map(_.columnDef)
@@ -370,10 +370,10 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
 
     try {
       columns should equal (Vector(None))
-      tdb.blockingRunOnSession(implicit ec => tm.alterColumnDefaults(_.id).seq)
+      tdb.blockingRunOnSession(implicit ec => tm.alterColumnDefaults(_.id)())
       columns should equal (Vector(Some(columnDefaultFormat("abc"))))
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
   }
 
   test("alterColumnNulls") {
@@ -385,7 +385,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     val table10 = TableQuery[Table10]
 
     val tm = TableMigration(table10)
-    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.tmpOldId).seq)
+    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.tmpOldId)())
 
     try {
       tdb.blockingRunOnSession { implicit e =>
@@ -395,7 +395,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
         } yield ()
       }
 
-      tdb.blockingRunOnSession(implicit ec => tm.alterColumnNulls(_.id).seq)
+      tdb.blockingRunOnSession(implicit ec => tm.alterColumnNulls(_.id)())
 
       intercept[SQLException] {
         tdb.blockingRunOnSession { implicit e =>
@@ -403,7 +403,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
         }
       }
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
   }
 
   test("renameColumn") {
@@ -419,16 +419,16 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
     } yield column.name
 
     val tm = TableMigration(table12)
-    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1).seq)
+    tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1)())
 
     try {
       columns should equal (Vector("oldname"))
 
-      tdb.blockingRunOnSession(implicit ec => tm.renameColumn(_.col1, "col1").seq)
+      tdb.blockingRunOnSession(implicit ec => tm.renameColumn(_.col1, "col1")())
 
       columns should equal (Vector("col1"))
     } finally
-      tdb.blockingRunOnSession(implicit ec => tm.drop.seq)
+      tdb.blockingRunOnSession(implicit ec => tm.drop())
 
     tm.renameColumn(_.col1, "col1").reverse should equal (tm.renameColumn(_.column[Long]("col1"), "oldname"))
   }
