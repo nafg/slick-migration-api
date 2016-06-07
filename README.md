@@ -1,6 +1,12 @@
 [![Build Status](https://travis-ci.org/nafg/slick-migration-api.svg?branch=master)](https://travis-ci.org/nafg/slick-migration-api)
 [![Coverage Status](https://img.shields.io/coveralls/nafg/slick-migration-api.svg)](https://coveralls.io/r/nafg/slick-migration-api?branch=master)
+[![Download](https://api.bintray.com/packages/naftoligug/maven/slick-migration-api/images/download.svg) ](https://bintray.com/naftoligug/maven/slick-migration-api/_latestVersion)
 
+| Slick version | SBT dependency                                        |
+|---------------|-------------------------------------------------------|
+| 3.1.1         | `"io.github.nafg" %% "slick-migration-api" % "0.2.1"` |
+| 3.0.3         | `"io.github.nafg" %% "slick-migration-api" % "0.2.0"` |
+| 2.1.0         | `"io.github.nafg" %% "slick-migration-api" % "0.1.1"` |
 
 A library for defining database migrations, for use with Slick,
 including a DSL to define type safe and typo safe table migrations
