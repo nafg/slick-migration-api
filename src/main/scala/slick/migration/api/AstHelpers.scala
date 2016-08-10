@@ -4,7 +4,8 @@ package migration.api
 import slick.ast.{ FieldSymbol, Node, Select, TableNode }
 import slick.driver.JdbcDriver
 import slick.lifted.{ Rep, Index }
-import slick.profile.{ RelationalProfile, SqlProfile }
+import slick.relational.RelationalProfile
+import slick.sql.SqlProfile
 
 private [api] object AstHelpers {
 
