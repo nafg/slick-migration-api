@@ -2,7 +2,7 @@ scalaVersion := "2.11.8"
 
 organization := "io.github.nafg"
 
-name := "slick-migration-api"
+name := "slick-migration-api_slick32"
 
 libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.2.0-M1"
 
