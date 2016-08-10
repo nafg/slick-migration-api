@@ -3,14 +3,14 @@ package migration.api
 
 import java.sql.{SQLException, Types}
 
-import slick.driver.JdbcDriver
+import slick.jdbc.JdbcProfile
 import slick.jdbc.JdbcBackend
 import slick.jdbc.meta.{MIndexInfo, MPrimaryKey, MQName, MTable}
 
 import com.typesafe.slick.testkit.util.JdbcTestDB
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Inside, Matchers}
 
-abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(implicit protected val dialect: Dialect[D])
+abstract class DbTest[D <: JdbcProfile](val tdb: JdbcTestDB { val profile: D })(implicit protected val dialect: Dialect[D])
   extends FunSuite
   with Matchers
   with Inside
@@ -18,9 +18,9 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
 
   implicit lazy val session = tdb.createDB.createSession
 
-  lazy val driver: D = tdb.driver
+  lazy val profile: D = tdb.profile
 
-  import driver.api._
+  import profile.api._
 
   override def beforeAll() = tdb.cleanUpBefore()
   override def afterAll() = {
@@ -199,8 +199,8 @@ abstract class DbTest[D <: JdbcDriver](val tdb: JdbcTestDB { val driver: D })(im
   }
 }
 
-trait CompleteDbTest { this: DbTest[_ <: JdbcDriver] =>
-  import driver.api._
+trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
+  import profile.api._
 
   test("addPrimaryKeys, dropPrimaryKeys") {
     def pkList = getTable("table8").map { table =>
