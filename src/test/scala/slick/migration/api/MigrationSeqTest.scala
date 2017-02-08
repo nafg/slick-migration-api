@@ -6,7 +6,7 @@ import org.scalatest.{FunSuite, Matchers}
 class MigrationSeqTest extends FunSuite with Matchers {
   test("& returns the right type and doesn't keep nesting") {
 
-    import slick.driver.H2Driver.api._
+    import slick.jdbc.H2Profile.api._
 
     val m = Migration.empty
     m & m & m should equal (MigrationSeq(m, m, m))

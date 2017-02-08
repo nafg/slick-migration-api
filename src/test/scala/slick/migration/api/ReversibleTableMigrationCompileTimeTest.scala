@@ -1,12 +1,12 @@
 package slick
 package migration.api
 
-import slick.driver.H2Driver
+import slick.jdbc.H2Profile
 
 object ReversibleTableMigrationCompileTimeTest {
   implicit val dialect = new H2Dialect
 
-  import H2Driver.api._
+  import H2Profile.api._
 
   val table1 = TableQuery[Table1]
   class Table1(tag: Tag) extends Table[(Int, Int)](tag, "table1") {

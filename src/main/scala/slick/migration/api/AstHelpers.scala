@@ -2,9 +2,11 @@ package slick
 package migration.api
 
 import slick.ast.{ FieldSymbol, Node, Select, TableNode }
-import slick.driver.JdbcDriver
+import slick.jdbc.JdbcProfile
 import slick.lifted.{ Rep, Index }
-import slick.profile.{ RelationalProfile, SqlProfile }
+import slick.relational.RelationalProfile
+import slick.sql.SqlProfile
+
 
 private [api] object AstHelpers {
 
@@ -74,7 +76,7 @@ private [api] trait AstHelpers {
    *               by calling `typeInfoFor`
    * @return a `ColumnInfo` representing the relevant information in `column`
    */
-  protected def columnInfo(driver: JdbcDriver, column: FieldSymbol): ColumnInfo = {
+  protected def columnInfo(driver: JdbcProfile, column: FieldSymbol): ColumnInfo = {
 
     import ast.{ ColumnOption => AColumnOption }
     import RelationalProfile.{ ColumnOption => RColumnOption }
