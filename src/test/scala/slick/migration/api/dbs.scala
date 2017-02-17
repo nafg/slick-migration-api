@@ -114,7 +114,7 @@ abstract class HsqlDB(confName: String) extends InternalJdbcTestDB(confName) {
     val tables = ResultSetAction[(String,String,String)](_.conn.getMetaData.getTables(null, "PUBLIC", null, null))
     tables.map(_.map(_._3).sorted)
   }
-  override def cleanUpBefore() {
+  override def cleanUpBefore(): Unit = {
     // Try to turn Hsqldb logging off -- does not work :(
     System.setProperty("hsqldb.reconfig_logging", "false")
     Logger.getLogger("org.hsqldb.persist.Logger").setLevel(Level.OFF)
@@ -145,5 +145,5 @@ abstract class DerbyDB(confName: String) extends InternalJdbcTestDB(confName) {
 }
 
 object DerbyDB {
-  val DEV_NULL = new java.io.OutputStream { def write(b: Int) {} }
+  val DEV_NULL = new java.io.OutputStream { def write(b: Int): Unit = () }
 }
