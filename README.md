@@ -9,6 +9,8 @@
 | 3.0.3         | `"io.github.nafg" %% "slick-migration-api_slick30" % "0.3.0"`    |
 | 2.1.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.1.1"`    |
 
+Artifacts are deployed to bintray and synchronized to JCenter, so add `resolvers += Resolver.jcenterRepo` to your build.
+
 A library for defining database migrations, for use with Slick,
 including a DSL to define type safe and typo safe table migrations
 that are defined in terms of Slick table definitions.
