@@ -1,6 +1,4 @@
-A library for defining database migrations, for use with Slick,
-including a DSL to define typesafe and typo-safe table migrations
-that are defined in terms of Slick table definitions.
+Write typesafe and typo-safe database migrations, using your existing Slick table definitions.
 
 [![Build Status](https://travis-ci.org/nafg/slick-migration-api.svg?branch=master)](https://travis-ci.org/nafg/slick-migration-api)
 [![Coverage Status](https://img.shields.io/coveralls/nafg/slick-migration-api.svg)](https://coveralls.io/r/nafg/slick-migration-api?branch=master)
