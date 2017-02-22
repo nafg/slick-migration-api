@@ -1,6 +1,12 @@
+A library for defining database migrations, for use with Slick,
+including a DSL to define typesafe and typo-safe table migrations
+that are defined in terms of Slick table definitions.
+
 [![Build Status](https://travis-ci.org/nafg/slick-migration-api.svg?branch=master)](https://travis-ci.org/nafg/slick-migration-api)
 [![Coverage Status](https://img.shields.io/coveralls/nafg/slick-migration-api.svg)](https://coveralls.io/r/nafg/slick-migration-api?branch=master)
 [![Download](https://api.bintray.com/packages/naftoligug/maven/slick-migration-api/images/download.svg) ](https://bintray.com/naftoligug/maven/slick-migration-api/_latestVersion)
+
+### Dependency
 
 | Slick version | SBT dependency                                                   |
 |---------------|------------------------------------------------------------------|
@@ -11,11 +17,8 @@
 
 Artifacts are deployed to bintray and synchronized to JCenter, so add `resolvers += Resolver.jcenterRepo` to your build.
 
-A library for defining database migrations, for use with Slick,
-including a DSL to define type safe and typo safe table migrations
-that are defined in terms of Slick table definitions.
 
-Example:
+### Example
 
 ````scala
 implicit val dialect = new H2Dialect
