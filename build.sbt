@@ -12,19 +12,19 @@ libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.2.0-M
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.0.1"     % "test"
 
-libraryDependencies += "com.h2database"      % "h2"                   % "1.4.192"   % "test"
+libraryDependencies += "com.h2database"      % "h2"                   % "1.4.194"   % "test"
 
-libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.8.11.2"  % "test"
+libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.14.2.1"  % "test"
 
-libraryDependencies += "org.apache.derby"    % "derby"                % "10.10.2.0" % "test"
+libraryDependencies += "org.apache.derby"    % "derby"                % "10.11.1.1" % "test"
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.3.4"     % "test"
 
-libraryDependencies += "org.postgresql"      % "postgresql"           % "9.4.1208"  % "test"
+libraryDependencies += "org.postgresql"      % "postgresql"           % "9.4.1212"  % "test"
 
-libraryDependencies += "mysql"               % "mysql-connector-java" % "5.1.39"    % "test"
+libraryDependencies += "mysql"               % "mysql-connector-java" % "6.0.5"     % "test"
 
-libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.7.21"    % "test"
+libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.7.22"    % "test"
 
 scalacOptions in (Compile, doc) ++= Seq("-groups", "-implicits")
 
