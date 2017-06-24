@@ -200,7 +200,7 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
   /**
    * Rename a column.
    * @param col a column-returning function, which is passed the table object.
-   * @example {{{ tblMig.renameColumns(_.col1, "newName") }}}
+   * @example {{{ tblMig.renameColumn(_.col1, "newName") }}}
    * @group oper
    */
   def renameColumn(col: T => Rep[_], to: String) = withData(data.copy(
