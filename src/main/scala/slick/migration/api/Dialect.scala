@@ -295,12 +295,12 @@ class PostgresDialect extends Dialect[PostgresProfile] {
 object GenericDialect {
 
   def apply(driver: JdbcProfile): Dialect[_ <: JdbcProfile] = driver match {
-    case DerbyProfile    => new DerbyDialect
-    case H2Profile       => new H2Dialect
-    case SQLiteProfile   => new SQLiteDialect
-    case HsqldbProfile   => new HsqldbDialect
-    case MySQLProfile    => new MySQLDialect
-    case PostgresProfile => new PostgresDialect
+    case _: DerbyProfile    => new DerbyDialect
+    case _: H2Profile       => new H2Dialect
+    case _: SQLiteProfile   => new SQLiteDialect
+    case _: HsqldbProfile   => new HsqldbDialect
+    case _: MySQLProfile    => new MySQLDialect
+    case _: PostgresProfile => new PostgresDialect
     case _ =>
       throw new IllegalArgumentException("Slick error : Unknown or unsupported jdbc driver found.")
   }
