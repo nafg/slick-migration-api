@@ -246,6 +246,10 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
   }
 
   test("addForeignKeys, dropForeignKeys") {
+    def allTables = getTables
+    val originalState = allTables.toSet
+    def tables = allTables.filter(!originalState.contains(_))
+
     class Table3(tag: Tag) extends Table[Long](tag, "table3") {
       def id = column[Long]("id", O.PrimaryKey)
       def * = id
@@ -267,16 +271,15 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
       tdb.blockingRunOnSession(implicit ec => tm2.create.addColumns(_.id, _.other)())
       tdb.blockingRunOnSession(implicit ec => tm3.create.addColumns(_.id)())
 
-      def fks = getTables.to[Set] map { t =>
-        (
-          t.name.name,
-          tdb.blockingRunOnSession(implicit e => t.getExportedKeys) map { fk =>
-            (fk.pkTable.name, fk.pkColumn, fk.fkTable.name, fk.fkColumn, fk.updateRule, fk.deleteRule, fk.fkName)
-          }
-          )
+      def tableFks = tables.to[Set] map { t =>
+        val name = t.name.name
+        val fks = tdb.blockingRunOnSession(implicit e => t.getExportedKeys) map { fk =>
+          (fk.pkTable.name, fk.pkColumn, fk.fkTable.name, fk.fkColumn, fk.updateRule, fk.deleteRule, fk.fkName)
+        }
+        name -> fks
       }
 
-      val before = fks
+      val before = tableFks
 
       before should equal (Set(
         ("table2", Vector.empty),
@@ -286,7 +289,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
       val createForeignKey = tm2.addForeignKeys(_.fk)
       tdb.blockingRunOnSession(implicit ec => createForeignKey())
 
-      fks should equal (Set(
+      tableFks should equal (Set(
         ("table2", Vector.empty),
         ("table3", Vector(("table3", "id", "table2", "other", noActionReturns, ForeignKeyAction.Cascade, Some("fk_other"))))
       ))
@@ -298,7 +301,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
 
       tdb.blockingRunOnSession(implicit ec => dropForeignKey())
 
-      fks should equal (before)
+      tableFks should equal (before)
     } finally {
       tdb.blockingRunOnSession(implicit ec => tm2.drop())
       tdb.blockingRunOnSession(implicit ec => tm3.drop())
