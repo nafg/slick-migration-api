@@ -157,6 +157,16 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
   }
 
   test("rename, renameIndex") {
+    def allTables = getTables.map(_.name.name).filterNot(_ == "oldIndexName")
+    def indexes = for {
+      tbls <- getTables
+      idxs <- tdb.blockingRunOnSession(implicit e => tbls.getIndexInfo())
+      name <- idxs.indexName
+    } yield name
+
+    val originalState = allTables.toSet
+    def tables = allTables.filter(!originalState.contains(_))
+
     class Table7Base(tag: Tag, name: String) extends Table[Long](tag, name) {
       def col1 = column[Long]("col1")
       def * = col1
@@ -171,13 +181,6 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
     tdb.blockingRunOnSession { implicit ec =>
       tm.create.addColumns(_.col1).addIndexes(_.index1)()
     }
-
-    def tables = getTables.map(_.name.name).filterNot(_ == "oldIndexName")
-    def indexes = for {
-      tbls <- getTables
-      idxs <- tdb.blockingRunOnSession(implicit e => tbls.getIndexInfo())
-      name <- idxs.indexName
-    } yield name
 
     tables should equal (Vector("oldname"))
     indexes should equal (Vector("oldIndexName"))
