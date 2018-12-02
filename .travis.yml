@@ -2,12 +2,12 @@ dist: xenial
 jdk:
   - oraclejdk8
 language: scala
-script: "sbt +clean +coverage +test"
+script: "sbt +clean +coverage +test +coverageReport"
 before_script:
 - mkdir -p test-dbs/postgres
 - sudo chown postgres:postgres test-dbs/postgres/
 after_success:
-- "sbt coveralls"
+- "sbt coverageAggregate coveralls"
 - "sbt +publish"
 services:
   - mysql
