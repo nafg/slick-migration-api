@@ -2,7 +2,7 @@ package slick
 package migration.api
 
 import slick.ast.FieldSymbol
-import slick.driver.JdbcDriver
+import slick.jdbc.JdbcProfile
 import slick.lifted._
 import slick.migration.api.AstHelpers._
 
@@ -78,13 +78,13 @@ object TableMigration {
   /**
    * Creates a [[TableMigration]] that will perform migrations on `table`
    */
-  def apply[T <: JdbcDriver#Table[_]](table: T)(implicit dialect: Dialect[_]) = new ReversibleTableMigration(table, TableMigrationData())
+  def apply[T <: JdbcProfile#Table[_]](table: T)(implicit dialect: Dialect[_]) = new ReversibleTableMigration(table, TableMigrationData())
 
   /**
    * Creates a [[TableMigration]] that will perform migrations on the table
    * referenced by `tableQuery`
    */
-  def apply[T <: JdbcDriver#Table[_]](tableQuery: TableQuery[T])(implicit dialect: Dialect[_]) = new ReversibleTableMigration(tableQuery.baseTableRow, TableMigrationData())
+  def apply[T <: JdbcProfile#Table[_]](tableQuery: TableQuery[T])(implicit dialect: Dialect[_]) = new ReversibleTableMigration(tableQuery.baseTableRow, TableMigrationData())
 }
 
 /**
@@ -115,7 +115,7 @@ object TableMigration {
  * }}}
  * @groupname oper Schema Manipulation Operations
  */
-sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implicit dialect: Dialect[_])
+sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implicit dialect: Dialect[_])
   extends SqlMigration with AstHelpers with Equals { outer =>
   /**
    * The concrete type of this `TableMigration` ([[ReversibleTableMigration]] or [[IrreversibleTableMigration]]).* Operations that are in of themselves reversible will return an instance of this type.
@@ -135,8 +135,8 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
     fieldSym(col.toNode) match {
       case Some(c) =>
         table.tableProvider match {
-          case driver: JdbcDriver => columnInfo(driver, c)
-          case _                  => sys.error("Invalid table: " + table)
+          case driver: JdbcProfile => columnInfo(driver, c)
+          case _                   => sys.error("Invalid table: " + table)
         }
       case None    => sys.error("Invalid column: " + col)
     }
@@ -362,7 +362,8 @@ sealed abstract class TableMigration[T <: JdbcDriver#Table[_]](table: T)(implici
  * The concrete [[TableMigration]] class used when irreversible operations are to be performed
  * (such as dropping a table)
  */
-final class IrreversibleTableMigration[T <: JdbcDriver#Table[_]] private[api](table: T, override val tableInfo: TableInfo, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_]) extends TableMigration[T](table) {
+final class IrreversibleTableMigration[T <: JdbcProfile#Table[_]] private[api](table: T, override val tableInfo: TableInfo, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_])
+  extends TableMigration[T](table) {
   type Self = IrreversibleTableMigration[T]
   protected def withData(d: TableMigrationData) = new IrreversibleTableMigration(table, tableInfo, d)
 }
@@ -372,7 +373,8 @@ final class IrreversibleTableMigration[T <: JdbcDriver#Table[_]] private[api](ta
  * This class extends [[ReversibleMigration]] and as such includes a [[reverse]] method
  * that returns a `TableMigration` that performs the inverse operations ("down migration").
  */
-final class ReversibleTableMigration[T <: JdbcDriver#Table[_]] private[api](table: T, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_]) extends TableMigration[T](table) with ReversibleMigration { outer =>
+final class ReversibleTableMigration[T <: JdbcProfile#Table[_]] private[api](table: T, protected[api] val data: TableMigrationData)(implicit dialect: Dialect[_])
+  extends TableMigration[T](table) with ReversibleMigration { outer =>
 
   /*
    * This should be redundant since the constructor is private[api] and should only be called
