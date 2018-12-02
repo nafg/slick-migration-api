@@ -284,7 +284,13 @@ class MySQLDialect extends Dialect[MySQLProfile] with SimulatedRenameIndex[MySQL
 
 class PostgresDialect extends Dialect[PostgresProfile] {
   override def columnType(ci: ColumnInfo): String =
-    if (ci.autoInc) "SERIAL" else ci.sqlType
+    (ci.autoInc, ci.sqlType) match {
+      case (false, t)         => t
+      case (true, "SMALLINT") => "SMALLSERIAL"
+      case (true, "INTEGER")  => "SERIAL"
+      case (true, "BIGINT")   => "BIGSERIAL"
+      case (true, _)          => throw new RuntimeException("Unsupported autoincrement type")
+    }
   override def autoInc(ci: ColumnInfo) = ""
   override def renameColumn(table: TableInfo, from: ColumnInfo, to: String) =
     s"""alter table ${quoteTableName(table)}
