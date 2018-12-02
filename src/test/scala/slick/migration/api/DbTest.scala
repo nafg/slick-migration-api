@@ -32,7 +32,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
   def noActionReturns: ForeignKeyAction = ForeignKeyAction.NoAction
 
   def getTables(implicit session: JdbcBackend#Session): Vector[MTable] =
-    tdb.blockingRunOnSession(implicit e => MTable.getTables(catalog, schema, None, None))
+    tdb.blockingRunOnSession(implicit e => MTable.getTables(catalog, schema, None, Some(Seq("TABLE"))))
   def getTable(name: String)(implicit session: JdbcBackend#Session): Option[MTable] =
     getTables.find(_.name.name == name)
 

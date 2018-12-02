@@ -80,7 +80,10 @@ class MySQLTest extends DbTest(new ExternalJdbcTestDB("mysql") {
   override val profile = MySQLProfile
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
+  override val catalog = None
   override def columnDefaultFormat(s: String) = s
+  override def getTables(implicit session: JdbcBackend#Session) =
+    super.getTables.filterNot(_.name.name == "sys_config")
 }
 
 class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
@@ -96,10 +99,6 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
   override val schema = Some("public")
-  override def getTables(implicit session: JdbcBackend#Session) =
-    super.getTables.filter(t =>
-      t.tableType.toUpperCase == "TABLE"
-    )
   override def longJdbcType = java.sql.Types.INTEGER
   override def columnDefaultFormat(s: String) = s"'$s'::character varying"
 }
