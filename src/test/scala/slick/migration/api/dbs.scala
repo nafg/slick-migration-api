@@ -99,7 +99,6 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
   override val schema = Some("public")
-  override def longJdbcType = java.sql.Types.INTEGER
   override def columnDefaultFormat(s: String) = s"'$s'::character varying"
 }
 
