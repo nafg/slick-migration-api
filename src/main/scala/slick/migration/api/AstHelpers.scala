@@ -117,4 +117,16 @@ private [api] trait AstHelpers {
       columns = index.on.flatMap(node => fieldSym(node))
     )
   }
+
+  protected def colInfo[T <: JdbcProfile#Table[_]](table: T)(f: T => Rep[_]): ColumnInfo = {
+    val col = f(table)
+    fieldSym(col.toNode) match {
+      case Some(c) =>
+        table.tableProvider match {
+          case driver: JdbcProfile => columnInfo(driver, c)
+          case _                   => sys.error("Invalid table: " + table)
+        }
+      case None    => sys.error("Invalid column: " + col)
+    }
+  }
 }

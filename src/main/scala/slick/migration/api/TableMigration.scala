@@ -130,18 +130,6 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
 
   protected def withData(data: TableMigrationData): Self
 
-  private def colInfo(f: T => Rep[_]): ColumnInfo = {
-    val col = f(table)
-    fieldSym(col.toNode) match {
-      case Some(c) =>
-        table.tableProvider match {
-          case driver: JdbcProfile => columnInfo(driver, c)
-          case _                   => sys.error("Invalid table: " + table)
-        }
-      case None    => sys.error("Invalid column: " + col)
-    }
-  }
-
   /**
    * Create the table.
    * Note: drop + create is allowed.
@@ -183,7 +171,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
    */
   def addColumns(cols: (T => Rep[_])*) = withData(data.copy(
     columnsCreate = data.columnsCreate ++
-      cols.map(colInfo)
+      cols.map(colInfo(table))
   ))
 
   /**
@@ -194,7 +182,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
    */
   def dropColumns(cols: (T => Rep[_])*) = withData(data.copy(
     columnsDrop = data.columnsDrop ++
-      cols.map(colInfo)
+      cols.map(colInfo(table))
   ))
 
   /**
@@ -205,7 +193,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
    */
   def renameColumn(col: T => Rep[_], to: String) = withData(data.copy(
     columnsRename = data.columnsRename +
-      (colInfo(col) -> to)
+      (colInfo(table)(col) -> to)
   ))
 
   /**
@@ -219,7 +207,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
     tableInfo,
     data.copy(
       columnsAlterType = data.columnsAlterType ++
-        cols.map(colInfo)
+        cols.map(colInfo(table))
     )
   )
 
@@ -234,7 +222,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
     tableInfo,
     data.copy(
       columnsAlterDefault = data.columnsAlterDefault ++
-        cols.map(colInfo)
+        cols.map(colInfo(table))
     )
   )
 
@@ -249,7 +237,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
     tableInfo,
     data.copy(
       columnsAlterNullability = data.columnsAlterNullability ++
-        cols.map(colInfo)
+        cols.map(colInfo(table))
     )
   )
 
