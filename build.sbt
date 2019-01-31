@@ -6,9 +6,9 @@ organization := "io.github.nafg"
 
 name := "slick-migration-api"
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.2.3"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.3.0"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.2.3"     % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.3.0"     % "test"
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.0.5"     % "test"
 
