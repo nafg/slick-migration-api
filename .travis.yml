@@ -1,6 +1,6 @@
 dist: xenial
 jdk:
-  - oraclejdk8
+  - openjdk8
 language: scala
 script: "sbt +clean +coverage +test +coverageReport"
 before_script:
