@@ -114,7 +114,7 @@ case class MigrationException(message: String, cause: Throwable) extends Runtime
  * @example {{{ SqlMigration("drop table t1", "update t2 set x=10 where y=20") }}}
  */
 object SqlMigration {
-  def apply(sql: String*) = {
+  def apply(sql: String*): SqlMigration = {
     def sql0 = sql
     new SqlMigration {
       override val sql = sql0

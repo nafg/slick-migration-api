@@ -22,14 +22,26 @@ Artifacts are deployed to bintray and synchronized to JCenter, so add `resolvers
 ### Example
 
 ````scala
-implicit val dialect = new H2Dialect
+import slick.jdbc.H2Profile.api._
+import slick.migration.api._
 
+val db = Database.forConfig("example-config")
+
+implicit val dialect: H2Dialect = new H2Dialect
+
+class MyTable(tag: Tag) extends Table[(Int, String)](tag, "my_table") {
+  val col1 = column[Int]("col1")
+  val col2 = column[String]("col2")
+  val index1 = index("idx1", col1)
+  def * = (col1, col2)
+}
+val MyTable = TableQuery[MyTable]
 val init =
-  TableMigration(myTable)
+  TableMigration(MyTable)
     .create
     .addColumns(_.col1, _.col2)
     .addIndexes(_.index1)
-    .renameColumn(_.col03, "col3")
+    .renameColumn(_.col1, "col3")
 val seed =
   SqlMigration("insert into myTable (col1, col2) values (10, 20)")
   
