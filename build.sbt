@@ -12,7 +12,7 @@ libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.3.0" 
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.0.5"     % "test"
 
-libraryDependencies += "com.h2database"      % "h2"                   % "1.4.197"   % "test"
+libraryDependencies += "com.h2database"      % "h2"                   % "1.4.198"   % "test"
 
 libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.25.2"    % "test" // latest version that works
 
