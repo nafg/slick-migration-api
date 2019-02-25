@@ -19,7 +19,7 @@ class MigrationSeqTest extends FunSuite with Matchers {
 
     val rm: ReversibleMigration = new ReversibleMigration {
       override def apply() = DBIO.successful(())
-      def reverse = this
+      def reverse: ReversibleMigration = this
     }
 
     val rms = rm & rm & rm

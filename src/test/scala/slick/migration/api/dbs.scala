@@ -62,13 +62,13 @@ class SqliteTest extends DbTest[SQLiteProfile](new SQLiteTestDB("jdbc:sqlite::me
 class DerbyTest extends DbTest(new DerbyDB("derbymem") {
   val dbName = "test1"
   val url = s"jdbc:derby:memory:$dbName;create=true"
-  override def cleanUpBefore() = {
+  override def cleanUpBefore(): Unit = {
     val dropUrl = s"jdbc:derby:memory:$dbName;drop=true"
     try {
       val db = profile.backend.Database.forURL(dropUrl, driver = jdbcDriver)
       await(db.run(SimpleJdbcAction(_.connection)))
     } catch {
-      case e: SQLException =>
+      case _: SQLException =>
     }
   }
 }) with CompleteDbTest {
@@ -122,9 +122,9 @@ abstract class HsqlDB(confName: String) extends InternalJdbcTestDB(confName) {
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }
 
-class SQLiteTestDB(dburl: String, confName: String) extends InternalJdbcTestDB(confName) {
+class SQLiteTestDB(dbUrl: String, confName: String) extends InternalJdbcTestDB(confName) {
   override val profile = SQLiteProfile
-  val url = dburl
+  val url = dbUrl
   val jdbcDriver = "org.sqlite.JDBC"
   override def localTables(implicit ec: ExecutionContext) =
     super.localTables.map(_.filter(s => !s.toLowerCase.contains("sqlite_")))

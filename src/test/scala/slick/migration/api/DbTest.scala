@@ -15,14 +15,14 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
   with Inside
   with BeforeAndAfterAll {
 
-  implicit lazy val session = tdb.createDB.createSession
+  implicit lazy val session: JdbcBackend#Session = tdb.createDB.createSession
 
   lazy val profile: P = tdb.profile
 
   import profile.api._
 
-  override def beforeAll() = tdb.cleanUpBefore()
-  override def afterAll() = {
+  override def beforeAll(): Unit = tdb.cleanUpBefore()
+  override def afterAll(): Unit = {
     session.close()
     tdb.cleanUpAfter()
   }
@@ -159,9 +159,9 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
   test("rename, renameIndex") {
     def allTables = getTables.map(_.name.name).filterNot(_ == "oldIndexName")
     def indexes = for {
-      tbls <- getTables
-      idxs <- tdb.blockingRunOnSession(implicit e => tbls.getIndexInfo())
-      name <- idxs.indexName
+      tables <- getTables
+      indexes <- tdb.blockingRunOnSession(implicit e => tables.getIndexInfo())
+      name <- indexes.indexName
     } yield name
 
     val originalState = allTables.toSet
@@ -172,17 +172,17 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
       def * = col1
       val index1 = index("oldIndexName", col1)
     }
-    class OldName(tag: Tag) extends Table7Base(tag, "oldname")
+    class OldName(tag: Tag) extends Table7Base(tag, "old_name")
     class Table7(tag: Tag) extends Table7Base(tag, "table7")
-    val oldname = TableQuery[OldName]
+    val oldName = TableQuery[OldName]
     val table7 = TableQuery[Table7]
 
-    val tm = TableMigration(oldname)
+    val tm = TableMigration(oldName)
     tdb.blockingRunOnSession { implicit ec =>
       tm.create.addColumns(_.col1).addIndexes(_.index1)()
     }
 
-    tables should equal (Vector("oldname"))
+    tables should equal (Vector("old_name"))
     indexes should equal (Vector("oldIndexName"))
 
     tdb.blockingRunOnSession(implicit ec => tm.rename("table7")())
@@ -197,7 +197,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
     } finally
       tdb.blockingRunOnSession(implicit ec => tm7.drop())
 
-    tm.rename("table7").reverse should equal (tm7.rename("oldname"))
+    tm.rename("table7").reverse should equal (tm7.rename("old_name"))
   }
 }
 
@@ -413,7 +413,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
 
   test("renameColumn") {
     class Table12(tag: Tag) extends Table[Long](tag, "table12") {
-      def col1 = column[Long]("oldname")
+      def col1 = column[Long]("old_name")
       def * = col1
     }
     val table12 = TableQuery[Table12]
@@ -427,7 +427,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     tdb.blockingRunOnSession(implicit ec => tm.create.addColumns(_.col1)())
 
     try {
-      columns should equal (Vector("oldname"))
+      columns should equal (Vector("old_name"))
 
       tdb.blockingRunOnSession(implicit ec => tm.renameColumn(_.col1, "col1")())
 
@@ -435,6 +435,6 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     } finally
       tdb.blockingRunOnSession(implicit ec => tm.drop())
 
-    tm.renameColumn(_.col1, "col1").reverse should equal (tm.renameColumn(_.column[Long]("col1"), "oldname"))
+    tm.renameColumn(_.col1, "col1").reverse should equal (tm.renameColumn(_.column[Long]("col1"), "old_name"))
   }
 }

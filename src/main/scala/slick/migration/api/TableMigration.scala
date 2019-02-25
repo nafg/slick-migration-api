@@ -331,7 +331,7 @@ sealed abstract class TableMigration[T <: JdbcProfile#Table[_]](table: T)(implic
    * @example {{{ tblMig.renameIndex(_.idxDef, "newName") }}}
    * @group oper
    */
-  def renameIndex(index: (T => Index), to: String) = withData(data.copy(
+  def renameIndex(index: T => Index, to: String) = withData(data.copy(
     indexesRename = data.indexesRename +
       (indexInfo(index(table)) -> to)
   ))

@@ -4,7 +4,7 @@ package migration.api
 import slick.jdbc.H2Profile
 
 object ReversibleTableMigrationCompileTimeTest {
-  implicit val dialect = new H2Dialect
+  implicit val dialect: H2Dialect = new H2Dialect
 
   import H2Profile.api._
 
