@@ -80,7 +80,7 @@ class MySQLTest extends DbTest(new ExternalJdbcTestDB("mysql") {
   override val profile = MySQLProfile
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
-  override val catalog = None
+  override val catalog = Some(tdb.confString("testDB"))
   override def columnDefaultFormat(s: String) = s
   override def getTables(implicit session: JdbcBackend#Session) =
     super.getTables.filterNot(_.name.name == "sys_config")
