@@ -102,14 +102,20 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
     s"""alter table ${quoteTableName(table)}
       | add column ${columnSql(column, newTable = false)}""".stripMargin
 
+  def addColumnWithInitialValue(table: TableInfo, column: ColumnInfo, rawSqlExpr: String) =
+    List(addColumn(table, column.copy(default = Some(rawSqlExpr)))) ++
+      (if (column.default.contains(rawSqlExpr)) Nil else List(alterColumnDefault(table, column)))
+
   def dropColumn(table: TableInfo, column: String) =
     s"""alter table ${quoteTableName(table)}
       | drop column ${quoteIdentifier(column)}""".stripMargin
 
-  def renameColumn(table: TableInfo, from: ColumnInfo, to: String) =
+  def renameColumn(table: TableInfo, from: String, to: String) =
     s"""alter table ${quoteTableName(table)}
-      | alter column ${quoteIdentifier(from.name)}
-      | rename to ${quoteIdentifier(to)}""".stripMargin
+       | alter column ${quoteIdentifier(from)}
+       | rename to ${quoteIdentifier(to)}""".stripMargin
+
+  def renameColumn(table: TableInfo, from: ColumnInfo, to: String): String = renameColumn(table, from.name, to)
 
   def alterColumnType(table: TableInfo, column: ColumnInfo): List[String] = List(
     s"""alter table ${quoteTableName(table)}
@@ -135,23 +141,26 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
 
   def migrateTable(table: TableInfo, actions: List[TableMigration.Action]): List[String] = {
     def loop(actions: List[TableMigration.Action]): List[String] = actions match {
-      case Nil                                      => Nil
-      case CreateTable :: rest                      =>
+      case Nil                                             => Nil
+      case CreateTable :: rest                             =>
         val (cols, other) = partition(rest) { case a: AddColumn => a }
         createTable(table, cols.map(_.info)) :: loop(other)
-      case AlterColumnType(info) :: rest            => alterColumnType(table, info) ::: loop(rest)
-      case RenameIndexTo(info, to) :: rest          => renameIndex(info, to) ::: loop(rest)
-      case DropTable :: rest                        => dropTable(table) :: loop(rest)
-      case RenameTableTo(to) :: rest                => renameTable(table, to) :: loop(rest)
-      case AddColumn(info) :: rest                  => addColumn(table, info) :: loop(rest)
-      case DropColumn(info) :: rest                 => dropColumn(table, info.name) :: loop(rest)
-      case RenameColumnTo(originalInfo, to) :: rest => renameColumn(table, originalInfo, to) :: loop(rest)
-      case AlterColumnDefault(info) :: rest         => alterColumnDefault(table, info) :: loop(rest)
-      case AlterColumnNullable(info) :: rest        => alterColumnNullability(table, info) :: loop(rest)
-      case DropPrimaryKey(info) :: rest             => dropPrimaryKey(table, info.name) :: loop(rest)
-      case AddPrimaryKey(info) :: rest              => createPrimaryKey(table, info.name, info.columns) :: loop(rest)
-      case DropForeignKey(fk) :: rest               => dropForeignKey(table, fk.name) :: loop(rest)
-      case AddForeignKey(fk) :: rest                =>
+      case AlterColumnType(info) :: rest                   => alterColumnType(table, info) ::: loop(rest)
+      case DropTable :: rest                               => dropTable(table) :: loop(rest)
+      case RenameTableTo(to) :: rest                       => renameTable(table, to) :: loop(rest)
+      case RenameTableFrom(from) :: rest                   => renameTable(table.copy(tableName = from), table.tableName) :: loop(rest)
+      case AddColumn(info) :: rest                         => addColumn(table, info) :: loop(rest)
+      case AddColumnAndSetInitialValue(info, expr) :: rest => addColumnWithInitialValue(table, info, expr) ::: loop(rest)
+      case DropColumn(info) :: rest                        => dropColumn(table, info.name) :: loop(rest)
+      case DropColumnOfName(name) :: rest                  => dropColumn(table, name) :: loop(rest)
+      case RenameColumnTo(originalInfo, to) :: rest        => renameColumn(table, originalInfo, to) :: loop(rest)
+      case RenameColumnFrom(currentInfo, from) :: rest     => renameColumn(table, from, currentInfo.name) :: loop(rest)
+      case AlterColumnDefault(info) :: rest                => alterColumnDefault(table, info) :: loop(rest)
+      case AlterColumnNullable(info) :: rest               => alterColumnNullability(table, info) :: loop(rest)
+      case DropPrimaryKey(info) :: rest                    => dropPrimaryKey(table, info.name) :: loop(rest)
+      case AddPrimaryKey(info) :: rest                     => createPrimaryKey(table, info.name, info.columns) :: loop(rest)
+      case DropForeignKey(fk) :: rest                      => dropForeignKey(table, fk.name) :: loop(rest)
+      case AddForeignKey(fk) :: rest                       =>
         val sql =
           createForeignKey(
             sourceTable = table,
@@ -163,8 +172,10 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
             onDelete = fk.onDelete
           )
         sql :: loop(rest)
-      case DropIndex(info) :: rest                  => dropIndex(info) :: loop(rest)
-      case CreateIndex(info) :: rest                => createIndex(info) :: loop(rest)
+      case DropIndex(info) :: rest                         => dropIndex(info) :: loop(rest)
+      case CreateIndex(info) :: rest                       => createIndex(info) :: loop(rest)
+      case RenameIndexTo(originalInfo, to) :: rest         => renameIndex(originalInfo, to) ::: loop(rest)
+      case RenameIndexFrom(currentInfo, from) :: rest      => renameIndex(currentInfo.copy(name = from), currentInfo.name) ::: loop(rest)
     }
 
     loop(actions.reverse.sortBy(_.sort))
@@ -182,12 +193,12 @@ class DerbyDialect extends Dialect[DerbyProfile] {
       addColumn(table, tmpColumn),
       s"update ${quoteTableName(table)} set ${quoteIdentifier(tmpColumnName)} = ${quoteIdentifier(column.name)}",
       dropColumn(table, column.name),
-      renameColumn(table, tmpColumn, column.name)
+      renameColumn(table, tmpColumn.name, column.name)
     )
   }
 
-  override def renameColumn(table: TableInfo, from: ColumnInfo, to: String) =
-    s"rename column ${quoteTableName(table)}.${quoteIdentifier(from.name)} to ${quoteIdentifier(to)}"
+  override def renameColumn(table: TableInfo, from: String, to: String) =
+    s"rename column ${quoteTableName(table)}.${quoteIdentifier(from)} to ${quoteIdentifier(to)}"
 
   override def alterColumnNullability(table: TableInfo, column: ColumnInfo) =
     s"""alter table ${quoteTableName(table)}
@@ -239,6 +250,12 @@ class MySQLDialect extends Dialect[MySQLProfile] with SimulatedRenameIndex[MySQL
   override def dropIndex(index: IndexInfo) =
     s"drop index ${quoteIdentifier(index.name)} on ${quoteTableName(tableInfo(index.table))}"
 
+  /**
+   * Requires MySQL 8.0
+   */
+  override def renameColumn(table: TableInfo, from: String, to: String) =
+    s"ALTER TABLE ${quoteTableName(table)} RENAME COLUMN ${quoteIdentifier(from)} TO ${quoteIdentifier(to)}"
+
   override def renameColumn(table: TableInfo, from: ColumnInfo, to: String) = {
     val newCol = from.copy(name = to)
     s"""alter table ${quoteTableName(table)}
@@ -273,10 +290,10 @@ class PostgresDialect extends Dialect[PostgresProfile] {
       case (true, _)          => throw new RuntimeException("Unsupported autoincrement type")
     }
   override def autoInc(ci: ColumnInfo) = ""
-  override def renameColumn(table: TableInfo, from: ColumnInfo, to: String) =
+  override def renameColumn(table: TableInfo, from: String, to: String) =
     s"""alter table ${quoteTableName(table)}
-      | rename column ${quoteIdentifier(from.name)}
-      | to ${quoteIdentifier(to)}""".stripMargin
+       | rename column ${quoteIdentifier(from)}
+       | to ${quoteIdentifier(to)}""".stripMargin
 }
 
 object GenericDialect {

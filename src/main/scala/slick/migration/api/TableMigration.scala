@@ -1,6 +1,6 @@
 package slick.migration.api
 
-import slick.jdbc.JdbcProfile
+import slick.jdbc.{JdbcProfile, JdbcType}
 import slick.lifted._
 import slick.migration.api.AstHelpers.{ColumnInfo, IndexInfo, PrimaryKeyInfo, TableInfo}
 
@@ -13,9 +13,13 @@ object TableMigration {
     case object DropTable extends Action(0)
     case object CreateTable extends Reversible(1)
     case class RenameTableTo(to: String) extends Reversible(2)
+    case class RenameTableFrom(from: String) extends Reversible(2)
     case class AddColumn(info: ColumnInfo) extends Reversible(3)
+    case class AddColumnAndSetInitialValue(info: ColumnInfo, rawSqlExpr: String) extends Reversible(3)
     case class DropColumn(info: ColumnInfo) extends Reversible(4)
+    case class DropColumnOfName(name: String) extends Action(4)
     case class RenameColumnTo(originalInfo: ColumnInfo, to: String) extends Reversible(5)
+    case class RenameColumnFrom(currentInfo: ColumnInfo, from: String) extends Reversible(5)
     case class AlterColumnType(info: ColumnInfo) extends Action(6)
     case class AlterColumnDefault(info: ColumnInfo) extends Action(6)
     case class AlterColumnNullable(info: ColumnInfo) extends Action(6)
@@ -26,6 +30,7 @@ object TableMigration {
     case class AddForeignKey(fk: ForeignKey) extends Reversible(8)
     case class CreateIndex(info: IndexInfo) extends Reversible(8)
     case class RenameIndexTo(originalInfo: IndexInfo, to: String) extends Reversible(9)
+    case class RenameIndexFrom(currentInfo: IndexInfo, from: String) extends Reversible(9)
   }
 
   sealed trait WithActions[A <: Action] {
@@ -62,23 +67,22 @@ object TableMigration {
       val tm0 = self.modActions(_ => List.empty[Action])
       self.actions.foldLeft(tm0) { (tm, action) =>
         action match {
-          case Action.CreateTable                      => tm.modActions(Action.DropTable :: _)
-          case Action.RenameTableTo(to)                =>
-            tm
-              .modActions(Action.RenameTableTo(self.tableInfo.tableName) :: _)
-              .copy(tableInfo = self.tableInfo.copy(tableName = to))(self.table)
-          case Action.AddColumn(info)                  => tm.modActions(Action.DropColumn(info) :: _)
-          case Action.DropColumn(info)                 => tm.modActions(Action.AddColumn(info) :: _)
-          case Action.RenameColumnTo(originalInfo, to) =>
-            tm.modActions(Action.RenameColumnTo(originalInfo.copy(name = to), originalInfo.name) :: _)
-          case Action.DropPrimaryKey(info)             => tm.modActions(Action.AddPrimaryKey(info) :: _)
-          case Action.DropForeignKey(fk)               => tm.modActions(Action.AddForeignKey(fk) :: _)
-          case Action.DropIndex(info)                  => tm.modActions(Action.CreateIndex(info) :: _)
-          case Action.AddPrimaryKey(info)              => tm.modActions(Action.DropPrimaryKey(info) :: _)
-          case Action.AddForeignKey(fk)                => tm.modActions(Action.DropForeignKey(fk) :: _)
-          case Action.CreateIndex(info)                => tm.modActions(Action.DropIndex(info) :: _)
-          case Action.RenameIndexTo(originalInfo, to)  =>
-            tm.modActions(Action.RenameIndexTo(originalInfo.copy(name = to), originalInfo.name) :: _)
+          case Action.CreateTable                          => tm.modActions(Action.DropTable :: _)
+          case Action.RenameTableTo(to)                    => tm.modActions(Action.RenameTableFrom(to) :: _)
+          case Action.RenameTableFrom(from)                => tm.modActions(Action.RenameTableTo(from) :: _)
+          case Action.AddColumn(info)                      => tm.modActions(Action.DropColumn(info) :: _)
+          case Action.AddColumnAndSetInitialValue(info, _) => tm.modActions(Action.DropColumn(info) :: _)
+          case Action.DropColumn(info)                     => tm.modActions(Action.AddColumn(info) :: _)
+          case Action.RenameColumnTo(originalInfo, to)     => tm.modActions(Action.RenameColumnFrom(originalInfo, to) :: _)
+          case Action.RenameColumnFrom(currentInfo, from)  => tm.modActions(Action.RenameColumnTo(currentInfo, from) :: _)
+          case Action.DropPrimaryKey(info)                 => tm.modActions(Action.AddPrimaryKey(info) :: _)
+          case Action.DropForeignKey(fk)                   => tm.modActions(Action.AddForeignKey(fk) :: _)
+          case Action.DropIndex(info)                      => tm.modActions(Action.CreateIndex(info) :: _)
+          case Action.AddPrimaryKey(info)                  => tm.modActions(Action.DropPrimaryKey(info) :: _)
+          case Action.AddForeignKey(fk)                    => tm.modActions(Action.DropForeignKey(fk) :: _)
+          case Action.CreateIndex(info)                    => tm.modActions(Action.DropIndex(info) :: _)
+          case Action.RenameIndexTo(originalInfo, to)      => tm.modActions(Action.RenameIndexFrom(originalInfo, to) :: _)
+          case Action.RenameIndexFrom(currentInfo, from)   => tm.modActions(Action.RenameIndexTo(currentInfo, from) :: _)
 
         }
       }
@@ -135,6 +139,9 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
   def rename(to: String) =
     modActions(withActions(Action.RenameTableTo(to)))
 
+  def renameFrom(from: String) =
+    modActions(withActions(Action.RenameTableFrom(from)))
+
   /**
    * Add columns to the table.
    * (If the table is being created, these may be incorporated into the `CREATE TABLE` statement.)
@@ -147,6 +154,25 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
     modActions(withActions(cols.map(columnInfo andThen Action.AddColumn)))
 
   /**
+   * @note `rawSqlExpr` is used as raw SQL, with the security implications thereof
+   */
+  def addColumnAndSetRaw(col: T => Rep[_], rawSqlExpr: String) =
+    modActions(withActions(Action.AddColumnAndSetInitialValue(columnInfo(col), rawSqlExpr)))
+
+  /**
+   * Adds a column and populates it without setting a column default for the future.
+   *
+   * If the column is NOT NULL, it is first created nullable
+   * @param col
+   * @param value
+   * @param jdbcType
+   * @tparam C
+   * @return
+   */
+  def addColumnAndSet[C](col: T => Rep[C], value: C)(implicit jdbcType: JdbcType[C]) =
+    addColumnAndSetRaw(col, jdbcType.valueToSQLLiteral(value))
+
+  /**
    * Drop columns.
    *
    * @param cols zero or more column-returning functions, which are passed the table object.
@@ -155,6 +181,9 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    */
   def dropColumns(cols: (T => Rep[_])*) =
     modActions(withActions(cols.map(columnInfo andThen Action.DropColumn)))
+
+  def dropColumns(name: String, names: String*) =
+    modActions(withActions((name +: names).map(Action.DropColumnOfName)))
 
   /**
    * Rename a column.
@@ -165,6 +194,9 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    */
   def renameColumn(col: T => Rep[_], to: String) =
     modActions(withActions(Action.RenameColumnTo(columnInfo(col), to)))
+
+  def renameColumnFrom(from: String, col: T => Rep[_]) =
+    modActions(withActions(Action.RenameColumnFrom(columnInfo(col), from)))
 
   /**
    * Changes the data type of columns based on the column definitions in `cols`
@@ -270,4 +302,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    */
   def renameIndex(index: T => Index, to: String) =
     modActions(withActions(Action.RenameIndexTo(indexInfo(index(table)), to)))
+
+  def renameIndexFrom(from: String, index: T => Index) =
+    modActions(withActions(Action.RenameIndexFrom(indexInfo(index(table)), from)))
 }

@@ -197,7 +197,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB { val profile: P })(
     } finally
       tdb.blockingRunOnSession(implicit ec => tm7.drop())
 
-    tm.rename("table7").reverse should equal (tm7.rename("old_name"))
+    tm.rename("table7").reverse.actions should equal (tm7.renameFrom("table7").actions)
   }
 }
 
@@ -435,6 +435,6 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     } finally
       tdb.blockingRunOnSession(implicit ec => tm.drop())
 
-    tm.renameColumn(_.col1, "col1").reverse should equal (tm.renameColumn(_.column[Long]("col1"), "old_name"))
+    tm.renameColumn(_.col1, "col1").reverse should equal (tm.renameColumnFrom("col1", _.col1))
   }
 }
