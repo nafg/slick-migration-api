@@ -41,6 +41,8 @@ case class ColumnInfo(name: String, sqlType: String, notNull: Boolean, autoInc: 
  * @param columns The columns that this index applies to, as `scala.slick.ast.FieldSymbol`
  */
 case class IndexInfo(table: TableNode, name: String, unique: Boolean, columns: Seq[FieldSymbol])
+
+  case class PrimaryKeyInfo(name: String, columns: Seq[FieldSymbol])
 }
 
 /**
@@ -64,12 +66,6 @@ private [api] trait AstHelpers {
     case Select(_, f: FieldSymbol) => Some(f)
     case _                         => None
   }
-
-  /**
-   * @return a `FieldSymbol` representing the column
-   */
-  protected def fieldSym(column: Rep[_]): FieldSymbol =
-    fieldSym(column.toNode) getOrElse sys.error("Invalid column: " + column)
 
   /**
    * @param driver a Slick driver, used to extract `ColumnInfo#sqlType` and `ColumnInfo#notNull`

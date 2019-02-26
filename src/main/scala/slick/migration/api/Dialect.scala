@@ -2,9 +2,10 @@ package slick
 package migration.api
 
 import slick.ast.FieldSymbol
-import slick.model.ForeignKeyAction
-import AstHelpers._
 import slick.jdbc._
+import slick.migration.api.AstHelpers._
+import slick.migration.api.TableMigration.Action._
+import slick.model.ForeignKeyAction
 
 
 /**
@@ -93,7 +94,7 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
   def dropIndex(index: IndexInfo) =
     s"drop index ${quoteIdentifier(index.name)}"
 
-  def renameIndex(old: IndexInfo, newName: String): Seq[String] = List(
+  def renameIndex(old: IndexInfo, newName: String): List[String] = List(
     s"alter index ${quoteIdentifier(old.name)} rename to ${quoteIdentifier(newName)}"
   )
 
@@ -110,7 +111,7 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
       | alter column ${quoteIdentifier(from.name)}
       | rename to ${quoteIdentifier(to)}""".stripMargin
 
-  def alterColumnType(table: TableInfo, column: ColumnInfo): Seq[String] = List(
+  def alterColumnType(table: TableInfo, column: ColumnInfo): List[String] = List(
     s"""alter table ${quoteTableName(table)}
       | alter column ${quoteIdentifier(column.name)}
       | set data type ${column.sqlType}""".stripMargin
@@ -126,67 +127,47 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
       | alter column ${quoteIdentifier(column.name)}
       | ${if (column.notNull) "set" else "drop"} not null""".stripMargin
 
-  /*
-   *  DROP | CREATE | RENAME | ACTION
-   *  false| false  | None   | assume table exists and do things via alter table
-   *  false| false  | Some   | rename table, plus as above
-   *  false| true   | None   | put as much as possible in the create table statement
-   *  false| true   | Some   | create with new name, plus as above
-   *  true | false  | None   | just drop it
-   *  true | false  | Some   | let it error (type safety??)
-   *  true | true   | None   | drop, then create table with as much as possible
-   *  true | true   | Some   | drop, then create table with new name, with as much as possible
-   *
-   *
-   * In summary:
-   *  - if drop, do the drop then continue
-   *  - if !drop, continue
-   *  - if create, incorporate as much as possible into the create statement, including any rename
-   *  - if !create, do rename + other alters
-   */
-  def migrateTable[E <: P](table: TableInfo, tmd: TableMigrationData): Seq[String] = {
-    val drop =
-      if(!tmd.tableDrop) Nil
-      else Seq(dropTable(table))
+  private def partition[A, B](xs: List[A])(toB: PartialFunction[A, B]): (List[B], List[A]) =
+    xs.foldLeft((List.empty[B], List.empty[A])) {
+      case ((bs, as), a) =>
+        toB.andThen(b => (b :: bs, as)).applyOrElse(a, (_: A) => (bs, a :: as))
+    }
 
-    val createColumns = if(tmd.tableCreate) {
-      val tbl = tmd.tableRename match {
-        case Some(name) => table.copy(tableName = name)
-        case None       => table
-      }
-      Seq(createTable(tbl, tmd.columnsCreate))
-    } else
-      tmd.tableRename.map{ renameTable(table, _) }.toList ++
-      tmd.columnsCreate.map{ addColumn(table, _) }
-    val modifyColumns =
-      tmd.columnsDrop.map{ c => dropColumn(table, c.name) } ++
-      tmd.columnsRename.map{ case (k, v) => renameColumn(table, k, v) } ++
-      tmd.columnsAlterType.flatMap{ alterColumnType(table, _) } ++
-      tmd.columnsAlterDefault.map{ alterColumnDefault(table, _) } ++
-      tmd.columnsAlterNullability.map{ alterColumnNullability(table, _) }
-    val migrateIndexes =
-      tmd.primaryKeysDrop.map{ pk => dropPrimaryKey(table, pk._1) } ++
-      tmd.primaryKeysCreate.map{ case (name, cols) => createPrimaryKey(table, name, cols) } ++
-      tmd.foreignKeysDrop.map{ fk => dropForeignKey(table, fk.name) } ++
-      tmd.foreignKeysCreate.map{ fk =>
-        createForeignKey(
-          table,
-          fk.name,
-          fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq),
-          tableInfo(fk.targetTable),
-          fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym(_).toSeq),
-          fk.onUpdate,
-          fk.onDelete
-        )
-      } ++
-      tmd.indexesDrop.map{ dropIndex } ++
-      tmd.indexesCreate.map{ createIndex } ++
-      tmd.indexesRename.flatMap{ case (k, v) => renameIndex(k, v) }
+  def migrateTable(table: TableInfo, actions: List[TableMigration.Action]): List[String] = {
+    def loop(actions: List[TableMigration.Action]): List[String] = actions match {
+      case Nil                                      => Nil
+      case CreateTable :: rest                      =>
+        val (cols, other) = partition(rest) { case a: AddColumn => a }
+        createTable(table, cols.map(_.info)) :: loop(other)
+      case AlterColumnType(info) :: rest            => alterColumnType(table, info) ::: loop(rest)
+      case RenameIndexTo(info, to) :: rest          => renameIndex(info, to) ::: loop(rest)
+      case DropTable :: rest                        => dropTable(table) :: loop(rest)
+      case RenameTableTo(to) :: rest                => renameTable(table, to) :: loop(rest)
+      case AddColumn(info) :: rest                  => addColumn(table, info) :: loop(rest)
+      case DropColumn(info) :: rest                 => dropColumn(table, info.name) :: loop(rest)
+      case RenameColumnTo(originalInfo, to) :: rest => renameColumn(table, originalInfo, to) :: loop(rest)
+      case AlterColumnDefault(info) :: rest         => alterColumnDefault(table, info) :: loop(rest)
+      case AlterColumnNullable(info) :: rest        => alterColumnNullability(table, info) :: loop(rest)
+      case DropPrimaryKey(info) :: rest             => dropPrimaryKey(table, info.name) :: loop(rest)
+      case AddPrimaryKey(info) :: rest              => createPrimaryKey(table, info.name, info.columns) :: loop(rest)
+      case DropForeignKey(fk) :: rest               => dropForeignKey(table, fk.name) :: loop(rest)
+      case AddForeignKey(fk) :: rest                =>
+        val sql =
+          createForeignKey(
+            sourceTable = table,
+            name = fk.name,
+            sourceColumns = fk.linearizedSourceColumns.flatMap(fieldSym(_).toSeq),
+            targetTable = tableInfo(fk.targetTable),
+            targetColumns = fk.linearizedTargetColumnsForOriginalTargetTable.flatMap(fieldSym(_).toSeq),
+            onUpdate = fk.onUpdate,
+            onDelete = fk.onDelete
+          )
+        sql :: loop(rest)
+      case DropIndex(info) :: rest                  => dropIndex(info) :: loop(rest)
+      case CreateIndex(info) :: rest                => createIndex(info) :: loop(rest)
+    }
 
-    drop ++
-      createColumns ++
-      modifyColumns ++
-      migrateIndexes
+    loop(actions.reverse.sortBy(_.sort))
   }
 }
 
@@ -228,7 +209,7 @@ class H2Dialect extends Dialect[H2Profile] {
 }
 
 trait SimulatedRenameIndex[T <: JdbcProfile] { this: Dialect[T] =>
-  override def renameIndex(old: IndexInfo, newName: String): Seq[String] =
+  override def renameIndex(old: IndexInfo, newName: String): List[String] =
     List(dropIndex(old), createIndex(old.copy(name = newName)))
 }
 
@@ -269,7 +250,7 @@ class MySQLDialect extends Dialect[MySQLProfile] with SimulatedRenameIndex[MySQL
     renameColumn(table, column, column.name)
 
   override def alterColumnType(table: TableInfo, column: ColumnInfo) =
-    Seq(renameColumn(table, column, column.name))
+    List(renameColumn(table, column, column.name))
 
   override def dropForeignKey(table: TableInfo, name: String) =
     s"alter table ${quoteTableName(table)} drop foreign key ${quoteIdentifier(name)}"

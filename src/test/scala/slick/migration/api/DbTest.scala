@@ -296,7 +296,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
 
       val dropForeignKey = createForeignKey.reverse
 
-      dropForeignKey.data.foreignKeysDrop.toList should equal (table2.baseTableRow.fk.fks.toList)
+      dropForeignKey.actions.collect { case TableMigration.Action.DropForeignKey(fk) => fk } should equal(table2.baseTableRow.fk.fks.toList)
       dropForeignKey should equal (tm2.dropForeignKeys(_.fk))
 
       tdb.blockingRunOnSession(implicit ec => dropForeignKey())
