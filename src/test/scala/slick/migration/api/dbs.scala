@@ -5,11 +5,13 @@ import java.sql.SQLException
 import java.util.logging.{Level, Logger}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.{global => ec}
 
 import slick.jdbc.GetResult._
 import slick.jdbc._
 
 import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
+
 
 object Dialects {
   implicit def derby   : Dialect[DerbyProfile   ] = new DerbyDialect
@@ -34,8 +36,8 @@ class H2TestDB(name: String) extends InternalJdbcTestDB(name) with DialectTestDB
 }
 
 class H2Test extends DbTest(new H2TestDB("h2mem")) with CompleteDbTest {
-  override def noActionReturns = slick.model.ForeignKeyAction.Restrict
-  override def longJdbcType = java.sql.Types.INTEGER
+  override val noActionReturns = slick.model.ForeignKeyAction.Restrict
+  override val longJdbcType = java.sql.Types.INTEGER
 }
 
 class HsqldbTest extends DbTest(new HsqlDB("hsqldbmem") {
@@ -51,12 +53,10 @@ class SqliteTest extends DbTest[SQLiteProfile](new SQLiteTestDB("jdbc:sqlite::me
   override def isPersistent = false
   override def isShared = false
 }) {
-  override def getTables(implicit session: JdbcBackend#Session) =
-    super.getTables.filterNot(t =>
-      t.name.name == "sqlite_sequence" ||
-      t.name.name.startsWith("sqlite_autoindex_")
-    )
-  override def longJdbcType = java.sql.Types.INTEGER
+  override def getTables =
+    super.getTables
+      .map(_.filterNot(t => t.name.name == "sqlite_sequence" || t.name.name.startsWith("sqlite_autoindex_")))
+  override val longJdbcType = java.sql.Types.INTEGER
 }
 
 class DerbyTest extends DbTest(new DerbyDB("derbymem") {
@@ -82,8 +82,8 @@ class MySQLTest extends DbTest(new ExternalJdbcTestDB("mysql") {
 }) with CompleteDbTest {
   override val catalog = Some(tdb.confString("testDB"))
   override def columnDefaultFormat(s: String) = s
-  override def getTables(implicit session: JdbcBackend#Session) =
-    super.getTables.filterNot(_.name.name == "sys_config")
+  override def getTables =
+    super.getTables.map(_.filterNot(_.name.name == "sys_config"))
 }
 
 class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
