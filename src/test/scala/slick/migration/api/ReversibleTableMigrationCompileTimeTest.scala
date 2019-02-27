@@ -30,6 +30,12 @@ class ReversibleTableMigrationCompileTimeTest extends FunSuite {
   val tm1 = tm.create.addColumns(_.col1)
   implicitly[tm1.type <:< Rev]
 
+  val seq = tm1 & tm1
+
+  implicitly[ToReversible[tm1.type]]
+  implicitly[ToReversible[seq.type]]
+  implicitly[seq.type <:< ReversibleMigrationSeq]
+
   test("non-Reversible TableMigration does not become Reversible") {
     // Adding an irreversible operation results in an irreversible TableMigration
     val tm2 = tm1.drop

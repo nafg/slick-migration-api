@@ -57,15 +57,13 @@ object TableMigration {
       override def apply(action: Action) = action :: _
     }
   }
-  implicit class TableMigrationReversible[T <: JdbcProfile#Table[_]](self: TableMigration[T, Action.Reversible])
-                                                                    (implicit dialect: Dialect[_])
-    extends ReversibleMigration {
 
-    override def apply() = self.apply()
-
+  implicit class Reversible[T <: JdbcProfile#Table[_]](val underlying: TableMigration[T, Action.Reversible])
+    extends ReversibleMigration with SqlMigration {
+    override def sql = underlying.sql
     override def reverse = {
-      val tm0 = self.modActions(_ => List.empty[Action])
-      self.actions.foldLeft(tm0) { (tm, action) =>
+      val tm0 = underlying.modActions(_ => List.empty[Action])
+      underlying.actions.foldLeft(tm0) { (tm, action) =>
         action match {
           case Action.CreateTable                          => tm.modActions(Action.DropTable :: _)
           case Action.RenameTableTo(to)                    => tm.modActions(Action.RenameTableFrom(to) :: _)
@@ -83,11 +81,13 @@ object TableMigration {
           case Action.CreateIndex(info)                    => tm.modActions(Action.DropIndex(info) :: _)
           case Action.RenameIndexTo(originalInfo, to)      => tm.modActions(Action.RenameIndexFrom(originalInfo, to) :: _)
           case Action.RenameIndexFrom(currentInfo, from)   => tm.modActions(Action.RenameIndexTo(currentInfo, from) :: _)
-
         }
       }
     }
   }
+
+  implicit def toReversible[T <: JdbcProfile#Table[_]]: ToReversible[TableMigration[T, Action.Reversible]] =
+    new ToReversible[TableMigration[T, Action.Reversible]](self => new Reversible(self))
 
   def apply[T <: JdbcProfile#Table[_]](table: T)
                                       (implicit dialect: Dialect[_]): TableMigration[T, Action.Reversible] =
@@ -160,14 +160,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
     modActions(withActions(Action.AddColumnAndSetInitialValue(columnInfo(col), rawSqlExpr)))
 
   /**
-   * Adds a column and populates it without setting a column default for the future.
-   *
-   * If the column is NOT NULL, it is first created nullable
-   * @param col
-   * @param value
-   * @param jdbcType
-   * @tparam C
-   * @return
+   * Adds a column and populates it without a column default in the future.
    */
   def addColumnAndSet[C](col: T => Rep[C], value: C)(implicit jdbcType: JdbcType[C]) =
     addColumnAndSetRaw(col, jdbcType.valueToSQLLiteral(value))
