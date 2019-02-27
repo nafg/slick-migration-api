@@ -8,7 +8,7 @@ Write typesafe and typo-safe database migrations, using your existing Slick tabl
 
 | Slick version | SBT dependency                                                   |
 |---------------|------------------------------------------------------------------|
-| 3.3.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.6.0"`    |
+| 3.3.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.6.1"`    |
 | 3.2.3         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.4"`    |
 | 3.2.1         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.2"`    |
 | 3.2.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.0"`    |
