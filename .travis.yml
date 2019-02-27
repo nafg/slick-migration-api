@@ -20,6 +20,6 @@ services:
 
 deploy:
   provider: script
-  script: sbt publish
+  script: sbt +publish
   on:
     tags: true
