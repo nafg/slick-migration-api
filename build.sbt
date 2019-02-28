@@ -10,7 +10,7 @@ libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.3.0"
 
 libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.3.0"     % "test"
 
-libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.0.5"     % "test"
+libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.0.6"     % "test"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "1.4.198"   % "test"
 
