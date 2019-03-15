@@ -14,7 +14,7 @@ libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.0.6" 
 
 libraryDependencies += "com.h2database"      % "h2"                   % "1.4.199"   % "test"
 
-libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.25.2"    % "test" // latest version that works
+libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.27.2"    % "test" // latest version that works
 
 // latest Derby that works
 // 10.14.2.0 fails with java.security.AccessControlException: access denied org.apache.derby.security.SystemPermission( "engine", "usederbyinternals" )
