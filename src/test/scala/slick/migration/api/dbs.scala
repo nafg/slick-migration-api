@@ -6,11 +6,12 @@ import java.util.logging.{Level, Logger}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.{global => ec}
-
 import slick.jdbc.GetResult._
 import slick.jdbc._
-
 import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
+import slick.dbio.{DBIOAction, Effect, NoStream}
+import slick.jdbc.meta.{MColumn, MTable}
+import slick.lifted.{AbstractTable, TableQuery}
 
 
 object Dialects {
@@ -20,6 +21,7 @@ object Dialects {
   implicit def hsqldb  : Dialect[HsqldbProfile  ] = new HsqldbDialect
   implicit def mysql   : Dialect[MySQLProfile   ] = new MySQLDialect
   implicit def postgres: Dialect[PostgresProfile] = new PostgresDialect
+  implicit def oracle  : Dialect[OracleProfile  ] = new OracleDialect
 }
 
 import slick.migration.api.Dialects._
@@ -102,8 +104,52 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
   override def columnDefaultFormat(s: String) = s"'$s'::character varying"
 }
 
-
 // copied from slick-testkit
+
+class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
+  val profile = OracleProfile
+  import profile.api.actionBasedSQLInterpolation
+  import profile.api._
+
+  override def canGetLocalTables = false
+  override def capabilities =
+    super.capabilities - TestDB.capabilities.jdbcMetaGetIndexInfo - TestDB.capabilities.transactionIsolation
+
+  override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
+    val tableNames = profile.defaultTables.map(_.map(_.name.name)).map(_.toVector)
+    tableNames
+  }
+
+  override def localSequences(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
+    // user_sequences much quicker than going to metadata if you don't know the schema they are going to be in
+    sql"select sequence_Name from user_sequences".as[String]
+  }
+
+  override def dropUserArtifacts(implicit session: profile.Backend#Session) =
+    blockingRunOnSession { implicit ec =>
+      for {
+        tables <- localTables
+        sequences <- localSequences
+        _ <- DBIO.seq(tables.map(t => sqlu"drop table #${profile.quoteIdentifier(t)} cascade constraints") ++
+                      sequences.map(s => sqlu"drop sequence #${profile.quoteIdentifier(s)}"): _*)
+      } yield ()
+    }
+}) with CompleteDbTest {
+  override val longJdbcType: Int = java.sql.Types.DECIMAL
+  override val dateJdbcType: Int = java.sql.Types.TIMESTAMP
+  override val noActionReturns = slick.model.ForeignKeyAction.Cascade
+
+  override val schema: Option[String] = Some("SLICKTEST") // from testkit.conf
+
+  override def getTables: DBIOAction[Vector[MTable],NoStream,Effect.All] =
+    MTable.getTables(Some(""), schema, None, Some(Seq("TABLE")))
+
+  // fixes returning column default value with spaces at the end (driver issue?)
+  override def getColumns[E <: AbstractTable[_]](table: TableQuery[E]): DBIOAction[Vector[MColumn],NoStream,Effect.All] =
+    super.getColumns(table).map(_.map { c =>
+      c.copy(columnDef = c.columnDef.map(_.trim))
+    })
+}
 
 abstract class HsqlDB(confName: String) extends InternalJdbcTestDB(confName) {
   override val profile = HsqldbProfile
