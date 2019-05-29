@@ -9,6 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.{global => ec}
 import slick.jdbc.GetResult._
 import slick.jdbc._
 import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
+import org.scalatest.Ignore
 import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.meta.{MColumn, MTable}
 import slick.lifted.{AbstractTable, TableQuery}
@@ -106,6 +107,16 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
 
 // copied from slick-testkit
 
+// To test on Oracle:
+// * Install Oracle DB
+//   - manually from https://www.oracle.com/technetwork/database/database-technologies/express-edition/downloads/index.html
+//   - or using Docker image: oracleinanutshell/oracle-xe-11g
+// * Correct connection config in '<project root>/test-dbs/testkit.conf' according to your DB config
+// * Download Oracle JDBC driver from https://www.oracle.com/technetwork/database/application-development/jdbc/downloads/index.html
+// and put it into '<project root>/lib' directory
+// * Remove '@Ignore' below
+// * Run 'sbt testOnly *OracleTest'
+@Ignore
 class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
   val profile = OracleProfile
   import profile.api.actionBasedSQLInterpolation
