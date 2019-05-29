@@ -7,11 +7,9 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
-
-import slick.jdbc.JdbcProfile
+import slick.jdbc.{HsqldbProfile, JdbcProfile, OracleProfile}
 import slick.jdbc.meta._
 import slick.lifted.AbstractTable
-
 import com.typesafe.slick.testkit.util.JdbcTestDB
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalactic.source.Position
@@ -69,6 +67,8 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
   val longJdbcType = Types.BIGINT
 
+  val dateJdbcType = Types.DATE
+
   /**
    * How JDBC metadata returns a column's default string value
    */
@@ -89,30 +89,30 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
     getTable(table).flatMap(_.getColumns)
 
 
-  class TestTable(tag: Tag) extends Table[Long](tag, "test_table") {
+  class TestTable(tag: Tag) extends Table[Long](tag, "TEST_TABLE") {
     def * = id
 
-    val id = column[Long]("id", O.AutoInc, O.PrimaryKey)
+    val id = column[Long]("ID", O.AutoInc, O.PrimaryKey)
 
-    val id1 = column[Int]("id_1")
-    val id2 = column[String]("id_2", O.Length(254))
+    val id1 = column[Int]("ID_1")
+    val id2 = column[String]("ID_2", O.Length(254))
 
-    val strWithDefault = column[String]("str_with_default", O.Default("abc"))
+    val strWithDefault = column[String]("STR_WITH_DEFAULT", O.Default("abc"))
 
-    val int1Nullable = column[Option[Int]]("int1")
+    val int1Nullable = column[Option[Int]]("INT1")
 
-    val int1 = column[Int]("int1")
-    val int2 = column[Int]("int2")
-    val int3 = column[Int]("int3")
+    val int1 = column[Int]("INT1")
+    val int2 = column[Int]("INT2")
+    val int3 = column[Int]("INT3")
 
-    def other = column[Long]("other")
+    def other = column[Long]("OTHER")
 
-    val index1 = index("index1", int1)
-    val index2 = index("index2", (int2, int3), unique = true)
+    val index1 = index("INDEX1", int1)
+    val index2 = index("INDEX2", (int2, int3), unique = true)
 
     val compoundPK = primaryKey("PRIMARY", (id1, id2)) // note mysql will always use the name "PRIMARY" anyway
 
-    lazy val fk = foreignKey("fk_other", other, TestTable)(_.id, ForeignKeyAction.NoAction, ForeignKeyAction.Cascade)
+    lazy val fk = foreignKey("FK_OTHER", other, TestTable)(_.id, ForeignKeyAction.NoAction, ForeignKeyAction.Cascade)
   }
 
   lazy val TestTable = TableQuery[TestTable]
@@ -125,17 +125,18 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
       try {
         val tableName = TestTable.baseTableRow.tableName
         inside(after filterNot before.contains) {
-          case (table @ MTable(MQName(_, _, `tableName`), "TABLE", _, _, _, _)) +: xs if xs.isEmpty =>
+          case (_ @ MTable(MQName(_, _, `tableName`), "TABLE", _, _, _, _)) +: xs if xs.isEmpty =>
             val cols =
-              runAction(table.getColumns)
+              runAction(getColumns(TestTable))
                 .map(c => c.name -> c)
                 .toMap
-            assert(cols.keySet === Set("id", "str_with_default"))
+            assert(cols.keySet === Set("ID", "STR_WITH_DEFAULT"))
             val default = Some(columnDefaultFormat("abc"))
-            inside(cols("id")) {
-              case MColumn(_, _, `longJdbcType`, _, _, _, _, Some(false), _, _, _, _, _, _, _, Some(true)) =>
+            val autoInc = Some(!profile.isInstanceOf[OracleProfile])
+            inside(cols("ID")) {
+              case MColumn(_, _, `longJdbcType`, _, _, _, _, Some(false), _, _, _, _, _, _, _, `autoInc`) =>
             }
-            inside(cols("str_with_default")) {
+            inside(cols("STR_WITH_DEFAULT")) {
               case MColumn(_, _, Types.VARCHAR, _, _, _, _, Some(false), _, `default`, _, _, _, _, _, Some(false)) =>
             }
         }
@@ -147,6 +148,21 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
       assert(runAction(getTables) === before)
     }
+  }
+
+  test("auto incrementing") {
+    val tm = TableMigration(TestTable)
+    runMigration(tm.create.addColumns(_.id, _.strWithDefault))
+    try {
+      runAction(TestTable.map(_.strWithDefault) += "row 1")
+      runAction(TestTable.map(_.strWithDefault) += "row 2")
+
+        profile match {
+          case _: HsqldbProfile => assert(runAction(TestTable.result).toSet === Set(0L, 1L))
+          case _                => assert(runAction(TestTable.result).toSet === Set(1L, 2L))
+        }
+    } finally
+      runMigration(tm.drop)
   }
 
   test("addColumns") {
@@ -179,13 +195,13 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
     try
       withBeforeAndAfter(createIndexes)(indexes) { (_, i2) =>
-        assert(i2(Some("index1") -> false) === Vector(Some("int1")))
-        assert(i2(Some("index2") -> true) === Vector(Some("int2"), Some("int3")))
+        assert(i2(Some("INDEX1") -> false) === Vector(Some("INT1")))
+        assert(i2(Some("INDEX2") -> true) === Vector(Some("INT2"), Some("INT3")))
 
         assert(createIndexes.reverse == tm.dropIndexes(_.index2, _.index1))
 
         withBeforeAndAfter(createIndexes.reverse)(indexes) { (_, i4) =>
-          assert(i4.keys.flatMap(_._1).exists(Set("index1", "index2")) === false)
+          assert(i4.keys.flatMap(_._1).exists(Set("INDEX1", "INDEX2")) === false)
         }
       }
     finally
@@ -199,11 +215,11 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
     runMigration(tm.create.addColumns(_.int1))
 
-    val renameMigration = tm.rename("other_name")
+    val renameMigration = tm.rename("OTHER_NAME")
 
     try
       withBeforeAndAfter(renameMigration)(tableNames) { (t2, t3) =>
-        assert(t3 -- t2 === Set("other_name"))
+        assert(t3 -- t2 === Set("OTHER_NAME"))
         assert(t2 -- t3 contains TestTable.baseTableRow.tableName)
       }
     finally
@@ -218,11 +234,11 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         .map(_.flatMap(_.flatMap(_.indexName)).toSet)
 
     withBeforeAndAfter(tm.create.addColumns(_.int1).addIndexes(_.index1))(indexNames) { case (_, i2) =>
-      assert(i2 === Set("index1"))
+      assert(i2 === Set("INDEX1"))
 
       try
-        withBeforeAndAfter(tm.renameIndex(_.index1, "other_index_name"))(indexNames) { (i3, i4) =>
-          assert(i4 -- i3 === Set("other_index_name"))
+        withBeforeAndAfter(tm.renameIndex(_.index1, "OTHER_INDEX_NAME"))(indexNames) { (i3, i4) =>
+          assert(i4 -- i3 === Set("OTHER_INDEX_NAME"))
         }
       finally
         runMigration(tm.drop)
@@ -245,7 +261,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     try
       withBeforeAndAfter(tm.addPrimaryKeys(_.compoundPK))(pks) { (pks1, pks2) =>
         assert(!pks1.contains(Some("PRIMARY")))
-        assert(pks2(Some("PRIMARY")) === Vector("id_1", "id_2"))
+        assert(pks2(Some("PRIMARY")) === Vector("ID_1", "ID_2"))
         assert(tm.addPrimaryKeys(_.compoundPK).reverse == tm.dropPrimaryKeys(_.compoundPK))
 
         withBeforeAndAfter(tm.dropPrimaryKeys(_.compoundPK))(pks) { (_, pks3) =>
@@ -271,7 +287,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     try
       withBeforeAndAfter(createForeignKey)(tableFks) { (fks2, fks3) =>
         inside(fks3(TestTable.baseTableRow.tableName)) {
-          case Vector(MForeignKey(_, "id", MQName(_, _, "test_table"), "other", _, `noActionReturns`, ForeignKeyAction.Cascade, Some("fk_other"), _, _)) =>
+          case Vector(MForeignKey(_, "ID", MQName(_, _, "TEST_TABLE"), "OTHER", _, `noActionReturns`, ForeignKeyAction.Cascade, Some("FK_OTHER"), _, _)) =>
         }
 
         assertResult(TestTable.baseTableRow.fk.fks.toList) {
@@ -305,11 +321,25 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
 
   test("alterColumnTypes") {
     val tm = TableMigration(TestTable)
-    runMigration(tm.create.addColumns(_.column[java.sql.Date]("str_with_default")))
+    runMigration(tm.create.addColumns(_.column[java.sql.Date]("STR_WITH_DEFAULT")))
 
     try
       withBeforeAndAfter(tm.alterColumnTypes(_.strWithDefault))(getColumns(TestTable)) { (before, after) =>
-        assert(before.map(_.sqlType) === Vector(Types.DATE))
+        assert(before.map(_.sqlType) === Vector(dateJdbcType))
+        assert(after.map(_.sqlType) === Vector(Types.VARCHAR))
+      }
+    finally
+      runMigration(tm.drop)
+  }
+
+  test("alterColumnTypes with data") {
+    val tm = TableMigration(TestTable)
+    runMigration(tm.create.addColumns(_.column[java.sql.Date]("STR_WITH_DEFAULT")))
+    runAction(TestTable.map(_.column[java.sql.Date]("STR_WITH_DEFAULT")) += new java.sql.Date(1))
+
+    try
+      withBeforeAndAfter(tm.alterColumnTypes(_.strWithDefault))(getColumns(TestTable)) { (before, after) =>
+        assert(before.map(_.sqlType) === Vector(dateJdbcType))
         assert(after.map(_.sqlType) === Vector(Types.VARCHAR))
       }
     finally
@@ -318,7 +348,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
 
   test("alterColumnDefaults") {
     val tm = TableMigration(TestTable)
-    runMigration(tm.create.addColumns(_.column[String]("str_with_default", profile.columnOptions.Length(254))))
+    runMigration(tm.create.addColumns(_.column[String]("STR_WITH_DEFAULT", profile.columnOptions.Length(254))))
 
     try
       withBeforeAndAfter(tm.alterColumnDefaults(_.strWithDefault))(getColumns(TestTable)) { (before, after) =>
@@ -349,9 +379,9 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     runMigration(tm.create.addColumns(_.int1))
 
     try
-      withBeforeAndAfter(tm.renameColumn(_.int1, "other_name"))(getColumns(TestTable)) { (before, after) =>
-        assert(before.map(_.name) === Vector("int1"))
-        assert(after.map(_.name) === Vector("other_name"))
+      withBeforeAndAfter(tm.renameColumn(_.int1, "OTHER_NAME"))(getColumns(TestTable)) { (before, after) =>
+        assert(before.map(_.name) === Vector("INT1"))
+        assert(after.map(_.name) === Vector("OTHER_NAME"))
     } finally
       runMigration(tm.drop)
 

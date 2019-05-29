@@ -7,6 +7,7 @@ import slick.migration.api.AstHelpers._
 import slick.migration.api.TableMigration.Action._
 import slick.model.ForeignKeyAction
 
+import java.security.SecureRandom
 
 /**
  * Base class for database dialects.
@@ -52,10 +53,11 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
   def columnList(columns: Seq[FieldSymbol]) =
     quotedColumnNames(columns).mkString("(", ", ", ")")
 
-  def createTable(table: TableInfo, columns: Seq[ColumnInfo]): String =
+  def createTable(table: TableInfo, columns: Seq[ColumnInfo]): List[String] = List(
     s"""create table ${quoteTableName(table)} (
       | ${columns map { columnSql(_, newTable = true) } mkString ", "}
       |)""".stripMargin
+  )
 
   def dropTable(table: TableInfo): String =
     s"drop table ${quoteTableName(table)}"
@@ -106,9 +108,10 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
     List(addColumn(table, column.copy(default = Some(rawSqlExpr)))) ++
       (if (column.default.contains(rawSqlExpr)) Nil else List(alterColumnDefault(table, column)))
 
-  def dropColumn(table: TableInfo, column: String) =
+  def dropColumn(table: TableInfo, column: String): List[String] = List(
     s"""alter table ${quoteTableName(table)}
       | drop column ${quoteIdentifier(column)}""".stripMargin
+  )
 
   def renameColumn(table: TableInfo, from: String, to: String) =
     s"""alter table ${quoteTableName(table)}
@@ -144,15 +147,15 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
       case Nil                                             => Nil
       case CreateTable :: rest                             =>
         val (cols, other) = partition(rest) { case a: AddColumn => a }
-        createTable(table, cols.map(_.info)) :: loop(other)
+        createTable(table, cols.map(_.info)) ::: loop(other)
       case AlterColumnType(info) :: rest                   => alterColumnType(table, info) ::: loop(rest)
       case DropTable :: rest                               => dropTable(table) :: loop(rest)
       case RenameTableTo(to) :: rest                       => renameTable(table, to) :: loop(rest)
       case RenameTableFrom(from) :: rest                   => renameTable(table.copy(tableName = from), table.tableName) :: loop(rest)
       case AddColumn(info) :: rest                         => addColumn(table, info) :: loop(rest)
       case AddColumnAndSetInitialValue(info, expr) :: rest => addColumnWithInitialValue(table, info, expr) ::: loop(rest)
-      case DropColumn(info) :: rest                        => dropColumn(table, info.name) :: loop(rest)
-      case DropColumnOfName(name) :: rest                  => dropColumn(table, name) :: loop(rest)
+      case DropColumn(info) :: rest                        => dropColumn(table, info.name) ::: loop(rest)
+      case DropColumnOfName(name) :: rest                  => dropColumn(table, name) ::: loop(rest)
       case RenameColumnTo(originalInfo, to) :: rest        => renameColumn(table, originalInfo, to) :: loop(rest)
       case RenameColumnFrom(currentInfo, from) :: rest     => renameColumn(table, from, currentInfo.name) :: loop(rest)
       case AlterColumnDefault(info) :: rest                => alterColumnDefault(table, info) :: loop(rest)
@@ -189,12 +192,11 @@ class DerbyDialect extends Dialect[DerbyProfile] {
   override def alterColumnType(table: TableInfo, column: ColumnInfo) = {
     val tmpColumnName = "temp_column"+(math.random*1000000).toInt
     val tmpColumn = column.copy(name = tmpColumnName)
-    List(
-      addColumn(table, tmpColumn),
-      s"update ${quoteTableName(table)} set ${quoteIdentifier(tmpColumnName)} = ${quoteIdentifier(column.name)}",
-      dropColumn(table, column.name),
-      renameColumn(table, tmpColumn.name, column.name)
-    )
+
+    addColumn(table, tmpColumn) ::
+    s"update ${quoteTableName(table)} set ${quoteIdentifier(tmpColumnName)} = ${quoteIdentifier(column.name)}" ::
+    dropColumn(table, column.name) :::
+    renameColumn(table, tmpColumn.name, column.name) :: Nil
   }
 
   override def renameColumn(table: TableInfo, from: String, to: String) =
@@ -296,6 +298,201 @@ class PostgresDialect extends Dialect[PostgresProfile] {
        | to ${quoteIdentifier(to)}""".stripMargin
 }
 
+class OracleDialect extends Dialect[OracleProfile] {
+
+  override def createTable(table: TableInfo, columns: Seq[ColumnInfo]): List[String] = {
+    super.createTable(table, columns) ++
+      columns.filter(_.autoInc).flatMap(addAutoInc(table, _, 1L))
+  }
+
+  override def quoteIdentifier(id: String): String = {
+    super.quoteIdentifier(id).toUpperCase
+  }
+
+  private def autoIncNames(t: TableInfo, c: ColumnInfo) = {
+    val random = new scala.util.Random(new SecureRandom())
+    (s"SEQ_${random.alphanumeric.take(16).mkString}", s"TRG_${random.alphanumeric.take(16).mkString}")
+  }
+
+  private def addAutoInc(table: TableInfo, column: ColumnInfo, startWith: Long): List[String] = {
+    val (seq, trg) = autoIncNames(table, column)
+    val tab = quoteTableName(table)
+    val col = quoteIdentifier(column.name)
+
+    List(
+      s"CREATE SEQUENCE $seq START WITH $startWith INCREMENT BY 1",
+      s"""
+        | DECLARE
+        | stmt VARCHAR(1000);
+        | BEGIN
+        |   stmt := 'CREATE OR REPLACE TRIGGER $trg
+        |   BEFORE INSERT
+        |   ON $tab
+        |   REFERENCING NEW AS NEW
+        |   FOR EACH ROW WHEN (NEW.$col IS NULL)
+        |   BEGIN SELECT $seq.nextval INTO :NEW.$col FROM sys.dual;
+        |   END;';
+        |   EXECUTE IMMEDIATE stmt;
+        | END;""".stripMargin
+    )
+  }
+
+  private def dropTriggerAndSequence(table: TableInfo, name: String) = {
+      val searchTrigger = s"""SELECT USER_TRIGGER_COLS.TRIGGER_NAME AS TRG_NAME, USER_DEPENDENCIES.referenced_name AS SEQ_NAME
+                              | FROM USER_TRIGGER_COLS
+                              | INNER JOIN USER_DEPENDENCIES on USER_TRIGGER_COLS.TRIGGER_NAME = USER_DEPENDENCIES.Name
+                              | WHERE USER_DEPENDENCIES.referenced_type = 'SEQUENCE' AND USER_DEPENDENCIES.type = 'TRIGGER'
+                              | AND USER_TRIGGER_COLS.COLUMN_NAME = '${name.toUpperCase}'
+                              | AND USER_TRIGGER_COLS.TABLE_NAME= '${table.tableName.toUpperCase}'""".stripMargin
+
+      s"""DECLARE
+          |  trgName varchar2(30);
+          |  seqName varchar2(30);
+          | BEGIN
+          |  FOR results IN ($searchTrigger) LOOP
+          |    trgName := results.TRG_NAME;
+          |    seqName := results.SEQ_NAME;
+          |    EXECUTE IMMEDIATE 'DROP TRIGGER ' || trgName;
+          |    EXECUTE IMMEDIATE 'DROP SEQUENCE ' || seqName;
+          |  END LOOP;
+          | END;""".stripMargin
+    }
+
+  override def autoInc(ci: ColumnInfo) = ""
+
+  override def createForeignKey(sourceTable: TableInfo, name: String, sourceColumns: Seq[FieldSymbol], targetTable: TableInfo, targetColumns: Seq[FieldSymbol], onUpdate: ForeignKeyAction, onDelete: ForeignKeyAction): String = {
+    val constraint = new StringBuilder(
+      s"""alter table ${quoteTableName(sourceTable)}
+      | add constraint ${quoteIdentifier(name)}
+      | foreign key ${columnList(sourceColumns)}
+      | references ${quoteTableName(targetTable)}
+      | (${quotedColumnNames(targetColumns) mkString ", "})""".stripMargin
+    )
+
+    if (onDelete == ForeignKeyAction.Cascade)
+      constraint append " on delete cascade "
+    if (onDelete == ForeignKeyAction.SetNull)
+      constraint append " on delete set null "
+    if (onUpdate == ForeignKeyAction.Cascade)
+      constraint append " initially deferred "
+
+    constraint.toString
+  }
+
+  override def createIndex(index: IndexInfo) = {
+    if (index.unique)
+      s"""alter table ${quoteTableName(tableInfo(index.table))}
+      | add constraint ${quoteIdentifier(index.name)} unique
+      | ${columnList(index.columns)}""".stripMargin
+    else super.createIndex(index)
+  }
+
+  override def dropPrimaryKey(table: TableInfo, name: String): String = {
+    val searchPk = s"""SELECT UC.CONSTRAINT_NAME, UC.TABLE_NAME
+                       | FROM USER_CONSTRAINTS UC
+                       | WHERE CONSTRAINT_TYPE = 'P' and UC.CONSTRAINT_NAME = '${name.toUpperCase}'""".stripMargin
+
+    s"""DECLARE
+        |  constName varchar2(30);
+        | BEGIN
+        |  FOR results IN ($searchPk) LOOP
+        |    constName := results.CONSTRAINT_NAME;
+        |    EXECUTE IMMEDIATE 'ALTER TABLE  ${quoteTableName(table)} ' ||
+        |    ' DROP CONSTRAINT ' || constName;
+        |  END LOOP;
+        | END;""".stripMargin
+  }
+
+  override def dropForeignKey(sourceTable: TableInfo, name: String): String = {
+    val searchFk = s"""SELECT DISTINCT UC.CONSTRAINT_NAME
+                       | FROM USER_CONSTRAINTS  UC
+                       | INNER JOIN USER_CONS_COLUMNS UCC ON uc.R_CONSTRAINT_NAME = UCC.CONSTRAINT_NAME
+                       | INNER JOIN USER_CONS_COLUMNS UCC2 ON UC.CONSTRAINT_NAME = UCC2.CONSTRAINT_NAME
+                       | WHERE UC.CONSTRAINT_TYPE = 'R'
+                       | AND UC.CONSTRAINT_NAME = '${name.toUpperCase}'""".stripMargin
+
+    s"""DECLARE
+        |  constName varchar2(30);
+        | BEGIN
+        |  FOR results IN ($searchFk) LOOP
+        |    constName := results.CONSTRAINT_NAME;
+        |    EXECUTE IMMEDIATE 'ALTER TABLE  ${quoteTableName(sourceTable)} ' ||
+        |    ' DROP CONSTRAINT ' || constName;
+        |  END LOOP;
+        | END;""".stripMargin
+  }
+
+  override def dropIndex(index: IndexInfo) = {
+    val searchUniqueIndex = s"""SELECT UC.CONSTRAINT_NAME, UC.TABLE_NAME
+                                | FROM USER_CONSTRAINTS UC
+                                | WHERE CONSTRAINT_TYPE = 'U' and UC.CONSTRAINT_NAME = '${index.name.toUpperCase}'""".stripMargin
+
+    val searchIndex = s"""SELECT INDEX_NAME
+                          | FROM USER_INDEXES
+                          | WHERE INDEX_NAME = '${index.name.toUpperCase}'""".stripMargin
+
+    if (index.unique) {
+      s"""DECLARE
+            |  constName varchar2(30);
+            | BEGIN
+            |  FOR results IN ($searchUniqueIndex) LOOP
+            |    constName := results.CONSTRAINT_NAME;
+            |    EXECUTE IMMEDIATE 'ALTER TABLE  ${quoteTableName(tableInfo(index.table))} ' ||
+            |    ' DROP CONSTRAINT ' || constName;
+            |  END LOOP;
+            | END;""".stripMargin
+    } else {
+      s"""DECLARE
+            |  idxName varchar2(30);
+            | BEGIN
+            |  FOR results IN ($searchIndex) LOOP
+            |    idxName := results.INDEX_NAME;
+            |    EXECUTE IMMEDIATE 'DROP INDEX ' || idxName;
+            |  END LOOP;
+            | END;""".stripMargin
+    }
+  }
+
+  override def renameIndex(old: IndexInfo, newName: String): List[String] = {
+    if (old.unique) super.renameIndex(old, newName) ++ List(
+      s"""alter table ${quoteTableName(tableInfo(old.table))}
+        | rename constraint ${quoteIdentifier(old.name)} to ${quoteIdentifier(newName)}""".stripMargin)
+    else super.renameIndex(old, newName)
+  }
+
+  override def addColumn(table: TableInfo, column: ColumnInfo): String = {
+    s"""alter table ${quoteTableName(table)}
+    | add ${columnSql(column, newTable = false)}""".stripMargin
+  }
+
+  override def dropColumn(table: TableInfo, column: String): List[String] =
+    super.dropColumn(table, column) :::
+      dropTriggerAndSequence(table, column) :: Nil
+
+  override def renameColumn(table: TableInfo, from: String, to: String): String = {
+    s"""alter table ${quoteTableName(table)}
+    | rename column ${quoteIdentifier(from)} to ${quoteIdentifier(to)}""".stripMargin
+  }
+
+  override def alterColumnType(table: TableInfo, column: ColumnInfo): List[String] = {
+    val tmpColumnName = "temp_column"+(math.random*1000000).toInt
+    val tmpColumn = column.copy(name = tmpColumnName)
+
+    addColumn(table, tmpColumn) ::
+    s"update ${quoteTableName(table)} set ${quoteIdentifier(tmpColumnName)} = ${quoteIdentifier(column.name)}" ::
+    dropColumn(table, column.name) :::
+    renameColumn(table, tmpColumn.name, column.name) :: Nil
+  }
+
+  override def alterColumnDefault(table: TableInfo, column: ColumnInfo): String =
+    s"""alter table ${quoteTableName(table)}
+    | modify (${quoteIdentifier(column.name)} default ${column.default getOrElse "null"})""".stripMargin
+
+  override def alterColumnNullability(table: TableInfo, column: ColumnInfo): String =
+    s"""alter table ${quoteTableName(table)}
+    | modify (${quoteIdentifier(column.name)} ${if (column.notNull) "not null" else "null"})""".stripMargin
+}
+
 object GenericDialect {
 
   def apply(driver: JdbcProfile): Dialect[_ <: JdbcProfile] = driver match {
@@ -305,6 +502,7 @@ object GenericDialect {
     case _: HsqldbProfile   => new HsqldbDialect
     case _: MySQLProfile    => new MySQLDialect
     case _: PostgresProfile => new PostgresDialect
+    case _: OracleProfile   => new OracleDialect
     case _ =>
       throw new IllegalArgumentException("Slick error : Unknown or unsupported jdbc driver found.")
   }
