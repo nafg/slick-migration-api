@@ -20,7 +20,7 @@ libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.27.2.
 // 10.14.2.0 fails with java.security.AccessControlException: access denied org.apache.derby.security.SystemPermission( "engine", "usederbyinternals" )
 libraryDependencies += "org.apache.derby"    % "derby"                % "10.11.1.1" % "test"
 
-libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.4.1"     % "test"
+libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.5.0"     % "test"
 
 libraryDependencies += "org.postgresql"      % "postgresql"           % "42.2.5"    % "test"
 
