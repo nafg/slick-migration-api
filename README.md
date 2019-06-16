@@ -6,15 +6,16 @@ Write typesafe and typo-safe database migrations, using your existing Slick tabl
 
 ### Dependency
 
-| Slick version | SBT dependency                                                   |
-|---------------|------------------------------------------------------------------|
-| 3.3.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.6.1"`    |
-| 3.2.3         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.4"`    |
-| 3.2.1         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.2"`    |
-| 3.2.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.0"`    |
-| 3.1.1         | `"io.github.nafg" %% "slick-migration-api"         % "0.3.0"`    |
-| 3.0.3         | `"io.github.nafg" %% "slick-migration-api_slick30" % "0.3.0"`    |
-| 2.1.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.1.1"`    |
+| Slick version | SBT dependency                                                   | Supported scala versions
+|---------------|------------------------------------------------------------------|--------------------------
+| 3.3.2         | `"io.github.nafg" %% "slick-migration-api"         % "0.7.0"`    | 2.12, 2.13
+| 3.3.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.6.1"`    | 2.11, 2.12
+| 3.2.3         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.4"`    | 2.11, 2.12
+| 3.2.1         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.2"`    | 2.11, 2.12
+| 3.2.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.4.0"`    | 2.11, 2.12
+| 3.1.1         | `"io.github.nafg" %% "slick-migration-api"         % "0.3.0"`    | 2.11
+| 3.0.3         | `"io.github.nafg" %% "slick-migration-api_slick30" % "0.3.0"`    | 2.10, 2.11
+| 2.1.0         | `"io.github.nafg" %% "slick-migration-api"         % "0.1.1"`    | 2.10
 
 Artifacts are deployed to bintray and synchronized to JCenter, so add `resolvers += Resolver.jcenterRepo` to your build.
 
