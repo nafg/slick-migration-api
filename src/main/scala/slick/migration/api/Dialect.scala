@@ -55,10 +55,9 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
 
   def createTable(table: TableInfo, columns: Seq[ColumnInfo], primaryKeys: Seq[PrimaryKeyInfo] = Nil): List[String] = List(
     s"""create table ${quoteTableName(table)} (
-      | ${columns map { columnSql(_, newTable = true) } mkString("", ", ", if (columns.nonEmpty && primaryKeys.nonEmpty) "," else "")}
-      | ${primaryKeys.map{ ci => quoteIdentifier(ci.name) }.mkString("primary key (", ", ", ")")}
+      | ${columns map { columnSql(_, newTable = true) } mkString ", "}
       |)""".stripMargin
-  )
+  ) ++ primaryKeys.map(info => createPrimaryKey(table, info.name, info.columns))
 
   def dropTable(table: TableInfo): String =
     s"drop table ${quoteTableName(table)}"
@@ -296,6 +295,14 @@ class PostgresDialect extends Dialect[PostgresProfile] {
       case (true, "BIGINT")   => "BIGSERIAL"
       case (true, _)          => throw new RuntimeException("Unsupported autoincrement type")
     }
+
+  override def createTable(table: TableInfo, columns: Seq[ColumnInfo], primaryKeys: Seq[PrimaryKeyInfo] = Nil): List[String] = List(
+    s"""create table ${quoteTableName(table)} (
+       | ${columns map { columnSql(_, newTable = true) } mkString("", ", ", if (columns.nonEmpty && primaryKeys.nonEmpty) "," else "")}
+       | ${primaryKeys.map{ ci => quoteIdentifier(ci.name) }.mkString("primary key (", ", ", ")")}
+       |)""".stripMargin
+  )
+
   override def autoInc(ci: ColumnInfo) = ""
   override def renameColumn(table: TableInfo, from: String, to: String): String =
     s"""alter table ${quoteTableName(table)}
