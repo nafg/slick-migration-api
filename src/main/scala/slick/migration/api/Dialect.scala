@@ -299,7 +299,7 @@ class PostgresDialect extends Dialect[PostgresProfile] {
   override def createTable(table: TableInfo, columns: Seq[ColumnInfo], primaryKeys: Seq[PrimaryKeyInfo] = Nil): List[String] = List(
     s"""create table ${quoteTableName(table)} (
        | ${columns map { columnSql(_, newTable = true) } mkString("", ", ", if (columns.nonEmpty && primaryKeys.nonEmpty) "," else "")}
-       | ${primaryKeys.map{ ci => quoteIdentifier(ci.name) }.mkString("primary key (", ", ", ")")}
+       | ${if (primaryKeys.nonEmpty) primaryKeys.map{ ci => quoteIdentifier(ci.name) }.mkString("primary key (", ", ", ")") else ""}
        |)""".stripMargin
   )
 
