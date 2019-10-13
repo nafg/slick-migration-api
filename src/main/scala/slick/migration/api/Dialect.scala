@@ -53,9 +53,10 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
   def columnList(columns: Seq[FieldSymbol]): String =
     quotedColumnNames(columns).mkString("(", ", ", ")")
 
-  def createTable(table: TableInfo, columns: Seq[ColumnInfo]): List[String] = List(
+  def createTable(table: TableInfo, columns: Seq[ColumnInfo], primaryKeys: Seq[PrimaryKeyInfo] = Nil): List[String] = List(
     s"""create table ${quoteTableName(table)} (
-      | ${columns map { columnSql(_, newTable = true) } mkString ", "}
+      | ${columns map { columnSql(_, newTable = true) } mkString("", ", ", if (columns.nonEmpty && primaryKeys.nonEmpty) "," else "")}
+      | ${primaryKeys.map{ ci => quoteIdentifier(ci.name) }.mkString("primary key (", ", ", ")")}
       |)""".stripMargin
   )
 
@@ -136,18 +137,22 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
       | alter column ${quoteIdentifier(column.name)}
       | ${if (column.notNull) "set" else "drop"} not null""".stripMargin
 
-  private def partition[A, B](xs: List[A])(toB: PartialFunction[A, B]): (List[B], List[A]) =
-    xs.foldLeft((List.empty[B], List.empty[A])) {
-      case ((bs, as), a) =>
-        toB.andThen(b => (b :: bs, as)).applyOrElse(a, (_: A) => (bs, a :: as))
+  private def partition(xs: List[TableMigration.Action]): (List[AddColumn], List[AddPrimaryKey], List[TableMigration.Action]) =
+    xs.foldLeft((List.empty[AddColumn], List.empty[AddPrimaryKey], List.empty[TableMigration.Action])) {
+      case ((cs, bs, as), a) =>
+        a match {
+          case ac: AddColumn      => (ac :: cs, bs, as)
+          case ap: AddPrimaryKey  => (cs, ap :: bs, as)
+          case _                  => (cs, bs, a :: as)
+        }
     }
 
   def migrateTable(table: TableInfo, actions: List[TableMigration.Action]): List[String] = {
     def loop(actions: List[TableMigration.Action]): List[String] = actions match {
       case Nil                                             => Nil
       case CreateTable :: rest                             =>
-        val (cols, other) = partition(rest) { case a: AddColumn => a }
-        createTable(table, cols.map(_.info)) ::: loop(other)
+        val (cols, pKeys, other) = partition(rest)
+        createTable(table, cols.map(_.info), pKeys.map(_.info)) ::: loop(other)
       case AlterColumnType(info) :: rest                   => alterColumnType(table, info) ::: loop(rest)
       case DropTable :: rest                               => dropTable(table) :: loop(rest)
       case RenameTableTo(to) :: rest                       => renameTable(table, to) :: loop(rest)
@@ -300,8 +305,8 @@ class PostgresDialect extends Dialect[PostgresProfile] {
 
 class OracleDialect extends Dialect[OracleProfile] {
 
-  override def createTable(table: TableInfo, columns: Seq[ColumnInfo]): List[String] = {
-    super.createTable(table, columns) ++
+  override def createTable(table: TableInfo, columns: Seq[ColumnInfo], primaryKeys: Seq[PrimaryKeyInfo] = Nil): List[String] = {
+    super.createTable(table, columns, primaryKeys) ++
       columns.filter(_.autoInc).flatMap(addAutoInc(table, _, 1L))
   }
 
