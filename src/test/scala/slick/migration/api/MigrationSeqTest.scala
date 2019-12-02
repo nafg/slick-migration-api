@@ -1,9 +1,10 @@
 package slick
 package migration.api
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class MigrationSeqTest extends FunSuite with Matchers {
+class MigrationSeqTest extends AnyFunSuite with Matchers {
   test("& returns the right type and doesn't keep nesting") {
 
     import slick.jdbc.H2Profile.api._
