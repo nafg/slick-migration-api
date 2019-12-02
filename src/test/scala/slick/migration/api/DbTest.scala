@@ -14,12 +14,13 @@ import com.typesafe.slick.testkit.util.JdbcTestDB
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalactic.source.Position
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Inside}
+import org.scalatest.{BeforeAndAfterAll, Inside}
+import org.scalatest.funsuite.AnyFunSuite
 
 
 abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
                                        (implicit protected val dialect: Dialect[P])
-  extends FunSuite with Inside with BeforeAndAfterAll with TypeCheckedTripleEquals {
+  extends AnyFunSuite with Inside with BeforeAndAfterAll with TypeCheckedTripleEquals {
 
   lazy val database = tdb.createDB
   lazy val session = database.createSession()
