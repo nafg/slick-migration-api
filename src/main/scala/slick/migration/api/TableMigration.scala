@@ -84,6 +84,9 @@ object TableMigration {
         }
       }
     }
+    override def toString: String = {
+      "Reversible " + this.underlying.toString
+    }
   }
 
   implicit def toReversible[T <: JdbcProfile#Table[_]]: ToReversible[TableMigration[T, Action.Reversible]] =
