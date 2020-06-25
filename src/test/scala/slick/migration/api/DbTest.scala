@@ -254,13 +254,13 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
       .addColumns(_.id)
       .addPrimaryKeys(_.compoundPK)
 
-    assert(migration.actions.head.sort == 0)
+    assert(migration.actions.last.sort == 0)
 
     runMigration(migration)
 
     val reversed = migration.reverse
 
-    assert(reversed.actions.last.sort == 0)
+    assert(reversed.actions.head.sort == 0)
 
     runMigration(reversed)
   }
