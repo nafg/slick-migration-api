@@ -63,7 +63,7 @@ object TableMigration {
     override def sql = underlying.sql
     override def reverse = {
       val tm0 = underlying.modActions(_ => List.empty[Action])
-      underlying.actions.foldLeft(tm0) { (tm, action) =>
+      underlying.actions.reverse.foldLeft(tm0) { (tm, action) =>
         action match {
           case Action.CreateTable                          => tm.modActions(Action.DropTable :: _)
           case Action.RenameTableTo(to)                    => tm.modActions(Action.RenameTableFrom(to) :: _)
