@@ -172,7 +172,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
     try {
       val addOtherColumns = tm.addColumns(_.int1Nullable, _.strWithDefault)
-      assert(addOtherColumns.reverse == tm.dropColumns(_.strWithDefault, _.int1Nullable))
+      assert(addOtherColumns.reverse == tm.dropColumns(_.int1Nullable, _.strWithDefault))
 
       withBeforeAndAfter(addOtherColumns)(getColumns(TestTable)) { (before, after) =>
         assert(before.length === 1)
@@ -199,7 +199,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         assert(i2(Some("INDEX1") -> false) === Vector(Some("INT1")))
         assert(i2(Some("INDEX2") -> true) === Vector(Some("INT2"), Some("INT3")))
 
-        assert(createIndexes.reverse == tm.dropIndexes(_.index2, _.index1))
+        assert(createIndexes.reverse == tm.dropIndexes(_.index1, _.index2))
 
         withBeforeAndAfter(createIndexes.reverse)(indexes) { (_, i4) =>
           assert(i4.keys.flatMap(_._1).exists(Set("INDEX1", "INDEX2")) === false)
@@ -336,7 +336,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     finally
       runMigration(tm.drop)
 
-    assert(tm.addColumns(_.id, _.int1).reverse == tm.dropColumns(_.int1, _.id))
+    assert(tm.addColumns(_.id, _.int1).reverse == tm.dropColumns(_.id, _.int1))
   }
 
   test("alterColumnTypes") {
