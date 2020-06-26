@@ -269,7 +269,10 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         assert(!after.contains("TEST_TABLE"))
       }
     } catch {
-      case _: Throwable => runMigration(tm.drop)
+      case _: Throwable =>
+        if (!this.profile.isInstanceOf[PostgresProfile]) {
+          runMigration(tm.drop)
+        }
     }
   }
 }
