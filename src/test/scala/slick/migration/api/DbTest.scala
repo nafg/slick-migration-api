@@ -246,7 +246,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
     }
   }
 
-  test("reverse multiple columns") {
+  test("reverse") {
     val tm = TableMigration(TestTable)
     val createTable = tm.create.addColumns(_.id, _.strWithDefault)
 
@@ -262,11 +262,11 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
     assert(reversed.sql(1).contains("STR_WITH_DEFAULT"))
     assert(reversed.sql(2).contains("drop table"))
 
-    try withBeforeAndAfter(reversed)(getTable(TestTable).asTry) { (before, after) =>
+    try withBeforeAndAfter(reversed)(getTables) { (before, after) =>
       // Only postgres can remove all columns from a table
       if (this.profile.isInstanceOf[PostgresProfile]) {
-        assert(before.isSuccess)
-        assert(after.isSuccess)
+        assert(before.contains("TEST_TABLE"))
+        assert(!after.contains("TEST_TABLE"))
       }
     } catch {
       case _: Throwable => runMigration(tm.drop)
