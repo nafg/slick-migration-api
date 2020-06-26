@@ -268,13 +268,8 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         assert(before.isSuccess)
         assert(after.isSuccess)
       }
-    } {
-      case ex: Throwable =>
-        if (!this.profile.isInstanceOf[PostgresProfile]) {
-          runMigration(tm.drop)
-        } else {
-          throw ex;
-        }
+    } catch {
+      case _: Throwable => runMigration(tm.drop)
     }
   }
 }
