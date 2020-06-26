@@ -172,7 +172,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
     try {
       val addOtherColumns = tm.addColumns(_.int1Nullable, _.strWithDefault)
-      assert(addOtherColumns.reverse == tm.dropColumns(_.int1Nullable, _.strWithDefault))
+      assert(addOtherColumns.reverse == tm.dropColumns(_.strWithDefault, _.int1Nullable))
 
       withBeforeAndAfter(addOtherColumns)(getColumns(TestTable)) { (before, after) =>
         assert(before.length === 1)
@@ -199,7 +199,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         assert(i2(Some("INDEX1") -> false) === Vector(Some("INT1")))
         assert(i2(Some("INDEX2") -> true) === Vector(Some("INT2"), Some("INT3")))
 
-        assert(createIndexes.reverse == tm.dropIndexes(_.index1, _.index2))
+        assert(createIndexes.reverse == tm.dropIndexes(_.index2, _.index1))
 
         withBeforeAndAfter(createIndexes.reverse)(indexes) { (_, i4) =>
           assert(i4.keys.flatMap(_._1).exists(Set("INDEX1", "INDEX2")) === false)
@@ -248,19 +248,25 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
   test("reverse") {
     val tm = TableMigration(TestTable)
+    val createTable = tm.create.addColumns(_.id, _.strWithDefault)
 
-    val migration = tm
-      .create
-      .addColumns(_.id)
-      .addPrimaryKeys(_.compoundPK)
+    assert(createTable.sql === List(
+      """create table "TEST_TABLE(
+        | "ID" BIGSERIAL NOT NULL PRIMARY KEY, "STR_WITH_DEFAULT" VARCHAR DEFAULT "abc"
+        |)""".stripMargin
+    ))
 
-    assert(migration.actions.last.sort == 0)
+    runMigration(createTable)
 
-    runMigration(migration)
+    val reversed = createTable.reverse
 
-    val reversed = migration.reverse
-
-    assert(reversed.actions.head.sort == 0)
+    assert(reversed.sql === List(
+      s"""alter table "TEST_TABLE"
+         |  drop column "STR_WITH_DEFAULT"""".stripMargin,
+      s"""alter table "TEST_TABLE"
+         |  drop column "ID"""".stripMargin,
+      s"""drop table "TEST_TABLE""""
+    ))
 
     runMigration(reversed)
   }
@@ -336,7 +342,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     finally
       runMigration(tm.drop)
 
-    assert(tm.addColumns(_.id, _.int1).reverse == tm.dropColumns(_.id, _.int1))
+    assert(tm.addColumns(_.id, _.int1).reverse == tm.dropColumns(_.int1, _.id))
   }
 
   test("alterColumnTypes") {

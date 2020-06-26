@@ -58,12 +58,13 @@ object TableMigration {
     }
   }
 
-  implicit class Reversible[T <: JdbcProfile#Table[_]](val underlying: TableMigration[T, Action.Reversible])
+  implicit class Reversible[T <: JdbcProfile#Table[_], A <: Action](val underlying: TableMigration[T, Action.Reversible])(
+    implicit dialect: Dialect[_], withActions: TableMigration.WithActions[A])
     extends ReversibleMigration with SqlMigration {
-    override def sql = underlying.sql
+    override def sql = dialect.migrateTable(underlying.tableInfo, underlying.actions, reverse = true)
     override def reverse = {
       val tm0 = underlying.modActions(_ => List.empty[Action])
-      underlying.actions.reverse.foldLeft(tm0) { (tm, action) =>
+      underlying.actions.foldLeft(tm0) { (tm, action) =>
         action match {
           case Action.CreateTable                          => tm.modActions(Action.DropTable :: _)
           case Action.RenameTableTo(to)                    => tm.modActions(Action.RenameTableFrom(to) :: _)
@@ -87,7 +88,7 @@ object TableMigration {
     override def toString = underlying.toString
   }
 
-  implicit def toReversible[T <: JdbcProfile#Table[_]]: ToReversible[TableMigration[T, Action.Reversible]] =
+  implicit def toReversible[T <: JdbcProfile#Table[_]](implicit dialect: Dialect[_]): ToReversible[TableMigration[T, Action.Reversible]] =
     new ToReversible[TableMigration[T, Action.Reversible]](self => new Reversible(self))
 
   def apply[T <: JdbcProfile#Table[_]](table: T)

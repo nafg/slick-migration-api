@@ -142,7 +142,7 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
         toB.andThen(b => (b :: bs, as)).applyOrElse(a, (_: A) => (bs, a :: as))
     }
 
-  def migrateTable(table: TableInfo, actions: List[TableMigration.Action]): List[String] = {
+  def migrateTable(table: TableInfo, actions: List[TableMigration.Action], reverse: Boolean = false): List[String] = {
     def loop(actions: List[TableMigration.Action]): List[String] = actions match {
       case Nil                                             => Nil
       case CreateTable :: rest                             =>
@@ -181,7 +181,10 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
       case RenameIndexFrom(currentInfo, from) :: rest      => renameIndex(currentInfo.copy(name = from), currentInfo.name) ::: loop(rest)
     }
 
-    loop(actions.reverse.sortBy(_.sort))
+    loop(actions.reverse.sortBy(_.sort)(
+      if (reverse) Ordering.Int.reverse
+      else Ordering.Int.min
+    ))
   }
 }
 
