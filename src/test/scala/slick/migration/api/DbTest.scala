@@ -258,8 +258,8 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
     val reversed = createTable.reverse
 
     assert(reversed.sql.size === 3)
-    assert(reversed.sql.head.contains("STR_WITH_DEFAULT"))
-    assert(reversed.sql(1).contains("ID"))
+    assert(reversed.sql.head.contains("ID"))
+    assert(reversed.sql(1).contains("STR_WITH_DEFAULT"))
     assert(reversed.sql(2).contains("drop table"))
 
     runMigration(reversed)
