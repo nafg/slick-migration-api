@@ -10,27 +10,27 @@ object TableMigration {
 
   object Action {
     sealed abstract class Reversible(sort: Int) extends Action(sort)
-    case object DropTable extends Action(0)
-    case object CreateTable extends Reversible(1)
-    case class RenameTableTo(to: String) extends Reversible(2)
-    case class RenameTableFrom(from: String) extends Reversible(2)
-    case class AddColumn(info: ColumnInfo) extends Reversible(3)
-    case class AddColumnAndSetInitialValue(info: ColumnInfo, rawSqlExpr: String) extends Reversible(3)
-    case class DropColumn(info: ColumnInfo) extends Reversible(4)
-    case class DropColumnOfName(name: String) extends Action(4)
-    case class RenameColumnTo(originalInfo: ColumnInfo, to: String) extends Reversible(5)
-    case class RenameColumnFrom(currentInfo: ColumnInfo, from: String) extends Reversible(5)
-    case class AlterColumnType(info: ColumnInfo) extends Action(6)
-    case class AlterColumnDefault(info: ColumnInfo) extends Action(6)
-    case class AlterColumnNullable(info: ColumnInfo) extends Action(6)
-    case class DropPrimaryKey(info: PrimaryKeyInfo) extends Reversible(7)
-    case class DropForeignKey(fk: ForeignKey) extends Reversible(7)
-    case class DropIndex(info: IndexInfo) extends Reversible(7)
-    case class AddPrimaryKey(info: PrimaryKeyInfo) extends Reversible(8)
-    case class AddForeignKey(fk: ForeignKey) extends Reversible(8)
-    case class CreateIndex(info: IndexInfo) extends Reversible(8)
-    case class RenameIndexTo(originalInfo: IndexInfo, to: String) extends Reversible(9)
-    case class RenameIndexFrom(currentInfo: IndexInfo, from: String) extends Reversible(9)
+    case object CreateTable extends Reversible(0)
+    case class RenameTableTo(to: String) extends Reversible(1)
+    case class AddColumn(info: ColumnInfo) extends Reversible(2)
+    case class AddColumnAndSetInitialValue(info: ColumnInfo, rawSqlExpr: String) extends Reversible(2)
+    case class RenameColumnTo(originalInfo: ColumnInfo, to: String) extends Reversible(3)
+    case class AlterColumnType(info: ColumnInfo) extends Action(4)
+    case class AlterColumnDefault(info: ColumnInfo) extends Action(4)
+    case class AlterColumnNullable(info: ColumnInfo) extends Action(4)
+    case class AddPrimaryKey(info: PrimaryKeyInfo) extends Reversible(5)
+    case class AddForeignKey(fk: ForeignKey) extends Reversible(6)
+    case class CreateIndex(info: IndexInfo) extends Reversible(7)
+    case class RenameIndexTo(originalInfo: IndexInfo, to: String) extends Reversible(8)
+    case class DropPrimaryKey(info: PrimaryKeyInfo) extends Reversible(9)
+    case class DropForeignKey(fk: ForeignKey) extends Reversible(9)
+    case class DropIndex(info: IndexInfo) extends Reversible(10)
+    case class RenameColumnFrom(currentInfo: ColumnInfo, from: String) extends Reversible(11)
+    case class RenameIndexFrom(currentInfo: IndexInfo, from: String) extends Reversible(11)
+    case class RenameTableFrom(from: String) extends Reversible(11)
+    case class DropColumnOfName(name: String) extends Action(12)
+    case class DropColumn(info: ColumnInfo) extends Reversible(12)
+    case object DropTable extends Action(13)
   }
 
   sealed trait WithActions[A <: Action] {
@@ -58,13 +58,12 @@ object TableMigration {
     }
   }
 
-  implicit class Reversible[T <: JdbcProfile#Table[_], A <: Action](val underlying: TableMigration[T, Action.Reversible])(
-    implicit dialect: Dialect[_], withActions: TableMigration.WithActions[A])
+  implicit class Reversible[T <: JdbcProfile#Table[_]](val underlying: TableMigration[T, Action.Reversible])
     extends ReversibleMigration with SqlMigration {
-    override def sql = dialect.migrateTable(underlying.tableInfo, underlying.actions, reverse = true)
+    override def sql = underlying.sql
     override def reverse = {
       val tm0 = underlying.modActions(_ => List.empty[Action])
-      underlying.actions.foldLeft(tm0) { (tm, action) =>
+      underlying.actions.reverse.foldLeft(tm0) { (tm, action) =>
         action match {
           case Action.CreateTable                          => tm.modActions(Action.DropTable :: _)
           case Action.RenameTableTo(to)                    => tm.modActions(Action.RenameTableFrom(to) :: _)
@@ -88,7 +87,7 @@ object TableMigration {
     override def toString = underlying.toString
   }
 
-  implicit def toReversible[T <: JdbcProfile#Table[_]](implicit dialect: Dialect[_]): ToReversible[TableMigration[T, Action.Reversible]] =
+  implicit def toReversible[T <: JdbcProfile#Table[_]]: ToReversible[TableMigration[T, Action.Reversible]] =
     new ToReversible[TableMigration[T, Action.Reversible]](self => new Reversible(self))
 
   def apply[T <: JdbcProfile#Table[_]](table: T)
