@@ -7,7 +7,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
-import slick.jdbc.{HsqldbProfile, JdbcProfile, OracleProfile}
+import slick.jdbc.{HsqldbProfile, JdbcProfile, OracleProfile, PostgresProfile}
 import slick.jdbc.meta._
 import slick.lifted.AbstractTable
 import com.typesafe.slick.testkit.util.JdbcTestDB
@@ -243,6 +243,36 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         }
       finally
         runMigration(tm.drop)
+    }
+  }
+
+  test("reverse") {
+    val tm = TableMigration(TestTable)
+    val createTable = tm.create.addColumns(_.id, _.strWithDefault)
+
+    assert(createTable.sql.size === 1)
+    assert(createTable.sql.head.contains("create table"))
+
+    runMigration(createTable)
+
+    val reversed = createTable.reverse
+
+    assert(reversed.sql.size === 3)
+    assert(reversed.sql.head.contains("ID"))
+    assert(reversed.sql(1).contains("STR_WITH_DEFAULT"))
+    assert(reversed.sql(2).contains("drop table"))
+
+    try withBeforeAndAfter(reversed)(getTables) { (before, after) =>
+      // Only postgres can remove all columns from a table
+      if (this.profile.isInstanceOf[PostgresProfile]) {
+        assert(before.contains("TEST_TABLE"))
+        assert(!after.contains("TEST_TABLE"))
+      }
+    } catch {
+      case _: Throwable =>
+        if (!this.profile.isInstanceOf[PostgresProfile]) {
+          runMigration(tm.drop)
+        }
     }
   }
 }
