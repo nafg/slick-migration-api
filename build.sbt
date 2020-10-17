@@ -23,7 +23,7 @@ libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.5.1" 
 
 libraryDependencies += "org.postgresql"      % "postgresql"           % "42.2.18"    % "test"
 
-libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.16"    % "test"
+libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.22"    % "test"
 
 libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.7.30"    % "test"
 
