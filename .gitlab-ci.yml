@@ -11,18 +11,21 @@ default:
 
 .sbt_alias: &sbt_alias |-
   shopt -s expand_aliases
-  alias sbt='sbt -v -mem 16384 -sbt-dir cache/.sbt/launchers -sbt-boot cache/.sbt/boot -ivy cache/.ivy2'
+  alias sbt='sbt -v -sbt-dir cache/.sbt/launchers -sbt-boot cache/.sbt/boot -ivy cache/.ivy2 -Dslick.testkit-config=test-dbs/testkit-gitlab.conf'
 
 build:
   stage: build
+  variables:
+    POSTGRES_PASSWORD: 1234
+    MYSQL_ROOT_PASSWORD: 1234
   services:
     - postgres:latest
+    - mysql
 
   before_script:
     - *sbt_alias
   script:
     - *sbt_alias
-    - sbt +compile
     - sbt +test
 
   artifacts:
