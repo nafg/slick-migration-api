@@ -1,0 +1,30 @@
+variables:
+  COURSIER_CACHE: cache/.coursier
+
+default:
+  image: nafg/docker-sbt
+  cache:
+    key: default
+    paths:
+      - cache
+
+
+.sbt_alias: &sbt_alias |-
+  shopt -s expand_aliases
+  alias sbt='sbt -v -mem 16384 -sbt-dir cache/.sbt/launchers -sbt-boot cache/.sbt/boot -ivy cache/.ivy2'
+
+build:
+  stage: build
+  services:
+    - postgres:latest
+
+  before_script:
+    - *sbt_alias
+  script:
+    - *sbt_alias
+    - sbt +compile
+    - sbt +test
+
+  artifacts:
+    reports:
+      junit: "*/target/test-reports/TEST-*.xml"
