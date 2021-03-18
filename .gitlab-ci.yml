@@ -18,6 +18,8 @@ stages:
 
 build:
   stage: build
+  rules:
+    - when: always
   variables:
     POSTGRES_PASSWORD: 1234
     MYSQL_ROOT_PASSWORD: 1234
@@ -25,11 +27,9 @@ build:
   services:
     - postgres:latest
     - mysql
-
   before_script:
     - *sbt_alias
   script:
-    - echo $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH
     - *sbt_alias
     - sbt +test
 
