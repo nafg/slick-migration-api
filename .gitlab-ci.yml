@@ -40,5 +40,10 @@ automerge:
   stage: automerge
   rules:
     - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH =~ /scala-steward//
-  script: curl -X PUT $CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge?merge_when_pipeline_succeeds=true&private_token=$PAT_AUTOMERGE_SCALA_STEWARD
+  script:
+    - BASE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge?merge_when_pipeline_succeeds=true"
+    - echo $BASE_URL
+    - FULL_URL="$BASE_URL&private_token=$PAT_AUTOMERGE_SCALA_STEWARD"
+    - echo $FULL_URL
+    - curl -X PUT $FULL_URL
 
