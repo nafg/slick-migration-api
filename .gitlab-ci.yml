@@ -8,10 +8,13 @@ default:
     paths:
       - cache
 
-
 .sbt_alias: &sbt_alias |-
   shopt -s expand_aliases
   alias sbt='sbt -v -sbt-dir cache/.sbt/launchers -sbt-boot cache/.sbt/boot -ivy cache/.ivy2 -Dslick.testkit-config=test-dbs/testkit-gitlab.conf'
+
+stages:
+  - build
+  - automerge
 
 build:
   stage: build
@@ -25,9 +28,16 @@ build:
   before_script:
     - *sbt_alias
   script:
+    - echo $CI_MERGE_REQUEST_PROJECT_PATH
     - *sbt_alias
     - sbt +test
 
   artifacts:
     reports:
       junit: "*/target/test-reports/TEST-*.xml"
+
+automerge:
+  stage: automerge
+  rules:
+    - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_PROJECT_PATH =~ /scala-steward//
+  script: curl -X PUT /projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge
