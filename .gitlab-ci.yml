@@ -21,6 +21,7 @@ build:
   variables:
     POSTGRES_PASSWORD: 1234
     MYSQL_ROOT_PASSWORD: 1234
+    CI_DEBUG_TRACE: "true"
   services:
     - postgres:latest
     - mysql
@@ -38,6 +39,7 @@ build:
 
 automerge:
   stage: automerge
+  needs: [build]
   rules:
-    - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_PROJECT_PATH =~ /scala-steward//
+    - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH =~ /scala-steward//
   script: curl -X PUT /projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge
