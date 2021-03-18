@@ -23,7 +23,6 @@ build:
   variables:
     POSTGRES_PASSWORD: 1234
     MYSQL_ROOT_PASSWORD: 1234
-    CI_DEBUG_TRACE: "true"
   services:
     - postgres:latest
     - mysql
