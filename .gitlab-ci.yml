@@ -29,7 +29,7 @@ build:
   before_script:
     - *sbt_alias
   script:
-    - echo $CI_MERGE_REQUEST_PROJECT_PATH
+    - echo $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH
     - *sbt_alias
     - sbt +test
 
@@ -39,7 +39,6 @@ build:
 
 automerge:
   stage: automerge
-  needs: [build]
   rules:
     - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH =~ /scala-steward//
   script: curl -X PUT /projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge
