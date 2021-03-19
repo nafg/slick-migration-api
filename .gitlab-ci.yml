@@ -1,0 +1,45 @@
+variables:
+  COURSIER_CACHE: cache/.coursier
+
+default:
+  image: nafg/docker-sbt
+  cache:
+    key: default
+    paths:
+      - cache
+
+.sbt_alias: &sbt_alias |-
+  shopt -s expand_aliases
+  alias sbt='sbt -v -sbt-dir cache/.sbt/launchers -sbt-boot cache/.sbt/boot -ivy cache/.ivy2 -Dslick.testkit-config=test-dbs/testkit-gitlab.conf'
+
+stages:
+  - build
+  - automerge
+
+build:
+  stage: build
+  rules:
+    - when: always
+  variables:
+    POSTGRES_PASSWORD: 1234
+    MYSQL_ROOT_PASSWORD: 1234
+  services:
+    - postgres:latest
+    - mysql
+  before_script:
+    - *sbt_alias
+  script:
+    - *sbt_alias
+    - sbt +test
+
+automerge:
+  stage: automerge
+  variables:
+    GIT_STRATEGY: none
+  rules:
+    - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH =~ /scala-steward//
+  script:
+    - BASE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge?merge_when_pipeline_succeeds=true"
+    - FULL_URL="$BASE_URL&private_token=$PAT_AUTOMERGE_SCALA_STEWARD"
+    - curl -X PUT $FULL_URL
+
