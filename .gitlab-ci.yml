@@ -29,7 +29,7 @@ test:
     - mysql
   script:
     - *sbt_alias
-    - sbt +coverage +test +coverageReport
+    - sbt +coverage +test
   after_script:
     - sbt coverageAggregate coveralls
 
