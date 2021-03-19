@@ -1,7 +1,8 @@
-crossScalaVersions := Seq("2.12.13", "2.13.5")
-scalaVersion := crossScalaVersions.value.last
-
-organization := "io.github.nafg"
+inThisBuild(List(
+  crossScalaVersions := Seq("2.12.13", "2.13.5"),
+  scalaVersion := crossScalaVersions.value.last,
+  organization := "io.github.nafg.slick-migration-api"
+))
 
 name := "slick-migration-api"
 
@@ -9,7 +10,7 @@ libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.3.3"
 
 libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.3.3"     % "test"
 
-libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.4"     % "test"
+libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.6"     % "test"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "1.4.200"   % "test"
 

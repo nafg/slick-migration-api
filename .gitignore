@@ -1,3 +1,6 @@
 target/
 test-dbs/databases.properties
 .idea/
+.bloop/
+.bsp/
+.metals

@@ -1,9 +1,10 @@
+defaults: {}
 pull_request_rules:
-  - name: automatic merge successful scala-steward PRs
+  - name: Automatically merge successful scala-steward PRs
     conditions:
       - author=scala-steward
-      - status-success=Travis CI - Pull Request
+      - check-success=Build and Test (ubuntu-latest, 2.12.13, adopt@1.8)
+      - check-success=Build and Test (ubuntu-latest, 2.13.5, adopt@1.8)
     actions:
-      merge:
-        method: merge
-        strict: true
+        merge:
+            strict: true
