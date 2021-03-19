@@ -13,12 +13,12 @@ default:
   alias sbt='sbt -v -sbt-dir cache/.sbt/launchers -sbt-boot cache/.sbt/boot -ivy cache/.ivy2 -Dslick.testkit-config=test-dbs/testkit-gitlab.conf'
 
 stages:
-  - build
+  - test
   - automerge
   - release
 
-build:
-  stage: build
+test:
+  stage: test
   rules:
     - when: always
   variables:
@@ -29,7 +29,9 @@ build:
     - mysql
   script:
     - *sbt_alias
-    - sbt +test
+    - sbt +coverage +test +coverageReport
+  after_script:
+    - sbt coverageAggregate coveralls
 
 automerge:
   stage: automerge
