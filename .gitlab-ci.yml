@@ -29,9 +29,8 @@ test:
     - mysql
   script:
     - *sbt_alias
-    - sbt +coverage +test
+    - sbt +test
   after_script:
-    - sbt coverageAggregate coveralls
 
 automerge:
   stage: automerge
