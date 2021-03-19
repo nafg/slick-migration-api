@@ -15,6 +15,7 @@ default:
 stages:
   - build
   - automerge
+  - release
 
 build:
   stage: build
@@ -26,20 +27,41 @@ build:
   services:
     - postgres:latest
     - mysql
-  before_script:
-    - *sbt_alias
   script:
     - *sbt_alias
     - sbt +test
 
 automerge:
   stage: automerge
-  variables:
-    GIT_STRATEGY: none
   rules:
     - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_SOURCE_PROJECT_PATH =~ /scala-steward//
+  variables:
+    GIT_STRATEGY: none
+  dependencies: []
+  cache: {}
   script:
     - BASE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/merge?merge_when_pipeline_succeeds=true"
     - FULL_URL="$BASE_URL&private_token=$PAT_AUTOMERGE_SCALA_STEWARD"
     - curl -X PUT $FULL_URL
 
+publish to sonatype:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d/
+  script:
+    - *sbt_alias
+    - sbt ci-release
+
+create release in gitlab:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d/
+  dependencies: []
+  cache: {}
+  script:
+    - echo 'running release_job'
+  release:
+    name: 'Release $CI_COMMIT_TAG'
+    description: 'Release $CI_COMMIT_TAG'
+    tag_name: '$CI_COMMIT_TAG'
