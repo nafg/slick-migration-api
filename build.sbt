@@ -10,7 +10,7 @@ libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.3.3"
 
 libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.3.3"     % "test"
 
-libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.6"     % "test"
+libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.8"     % "test"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "1.4.200"   % "test"
 
@@ -20,9 +20,9 @@ libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.34.0"
 // 10.14.2.0 fails with java.security.AccessControlException: access denied org.apache.derby.security.SystemPermission( "engine", "usederbyinternals" )
 libraryDependencies += "org.apache.derby"    % "derby"                % "10.11.1.1" % "test"
 
-libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.5.1"     % "test"
+libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.5.2"     % "test"
 
-libraryDependencies += "org.postgresql"      % "postgresql"           % "42.2.19"    % "test"
+libraryDependencies += "org.postgresql"      % "postgresql"           % "42.2.20"    % "test"
 
 libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.16"    % "test"
 
