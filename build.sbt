@@ -26,7 +26,7 @@ libraryDependencies += "org.postgresql"      % "postgresql"           % "42.2.23
 
 libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.16"    % "test"
 
-libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.7.31"    % "test"
+libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.7.32"    % "test"
 
 scalacOptions in (Compile, doc) ++= Seq("-groups", "-implicits")
 
