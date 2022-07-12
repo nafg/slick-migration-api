@@ -28,8 +28,8 @@ libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.16"
 
 libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "1.7.36"    % "test"
 
-scalacOptions in (Compile, doc) ++= Seq("-groups", "-implicits")
+(Compile / doc / scalacOptions) ++= Seq("-groups", "-implicits")
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
-testOptions in Test += Tests.Argument("-oF")
+Test / testOptions += Tests.Argument("-oF")
