@@ -27,6 +27,8 @@ libraryDependencies += "com.mysql"               % "mysql-connector-j" % "9.3.0"
 
 libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "2.0.17"    % "test"
 
+libraryDependencies += "com.oracle.database.jdbc.debug" % "ojdbc8_g" % "21.6.0.0.1" % Test
+
 (Compile / doc / scalacOptions) ++= Seq("-groups", "-implicits")
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xsource:3")
