@@ -10,6 +10,7 @@ Write typesafe and typo-safe database migrations, using your existing Slick tabl
 
 | Slick version | SBT dependency                                                            | Supported scala versions
 |---------------|---------------------------------------------------------------------------|--------------------------
+| 3.4.0         | `"io.github.nafg.slick-migration-api" %% "slick-migration-api" % "0.9.0"` | 2.12, 2.13
 | 3.3.3         | `"io.github.nafg.slick-migration-api" %% "slick-migration-api" % "0.8.2"` | 2.12, 2.13
 | 3.3.2         | `"io.github.nafg"                     %% "slick-migration-api" % "0.8.0"` | 2.12, 2.13
 | 3.3.0         | `"io.github.nafg"                     %% "slick-migration-api" % "0.6.1"` | 2.11, 2.12
