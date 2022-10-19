@@ -10,7 +10,7 @@ libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.4.1"
 
 libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.4.1"     % "test"
 
-libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.13"     % "test"
+libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.14"     % "test"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "1.4.200"   % "test"
 
@@ -26,7 +26,7 @@ libraryDependencies += "org.postgresql"      % "postgresql"           % "42.5.0"
 
 libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.16"    % "test"
 
-libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "2.0.1"    % "test"
+libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "2.0.3"    % "test"
 
 (Compile / doc / scalacOptions) ++= Seq("-groups", "-implicits")
 
