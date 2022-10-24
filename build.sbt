@@ -16,9 +16,7 @@ libraryDependencies += "com.h2database"      % "h2"                   % "1.4.200
 
 libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.39.3.0"    % "test" // latest version that works
 
-// latest Derby that works
-// 10.14.2.0 fails with java.security.AccessControlException: access denied org.apache.derby.security.SystemPermission( "engine", "usederbyinternals" )
-libraryDependencies += "org.apache.derby"    % "derby"                % "10.12.1.1" % "test"
+libraryDependencies += "org.apache.derby"    % "derby"                % "10.14.2.0" % "test"
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.0"     % "test"
 
