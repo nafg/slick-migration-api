@@ -83,6 +83,7 @@ class MySQLTest extends DbTest(new ExternalJdbcTestDB("mysql") {
   override val profile = MySQLProfile
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
+  override val noActionReturns = slick.model.ForeignKeyAction.Restrict
   override val catalog = Some(tdb.confString("testDB"))
   override def columnDefaultFormat(s: String) = s
   override def getTables =
