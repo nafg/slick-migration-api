@@ -14,16 +14,9 @@ trait Migration {
 object Migration {
   implicit class MigrationConcat[M <: Migration](m: M) {
     /**
-     *
-     * @usecase def &(n: ReversibleMigration): ReversibleMigrationSeq
-     * Append a [[ReversibleMigration]] to form either a
-     * [[ReversibleMigrationSeq]] if the left side of `&` is also a [[ReversibleMigration]];
-     * or else a plain [[MigrationSeq]]
-     * @param n the [[ReversibleMigration]] to append
-     * @example {{{ val combined = mig1 & mig2 & mig3 }}}
-     *
-     * @usecase def &(n: Migration): MigrationSeq
      * Append another [[Migration]] to form a [[MigrationSeq]]
+     * If both sides are [[ReversibleMigration]]s then a [[ReversibleMigrationSeq]]
+     * is returned.
      * @param n the [[Migration]] to append
      * @example {{{ val combined = mig1 & mig2 & mig3 }}}
      */
