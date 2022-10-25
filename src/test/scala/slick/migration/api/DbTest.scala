@@ -126,7 +126,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
       try {
         val tableName = TestTable.baseTableRow.tableName
         inside(after filterNot before.contains) {
-          case (_ @ MTable(MQName(_, _, `tableName`), "TABLE", _, _, _, _)) +: xs if xs.isEmpty =>
+          case (_ @ MTable(MQName(_, _, `tableName`), "TABLE" | "BASE TABLE", _, _, _, _)) +: xs if xs.isEmpty =>
             val cols =
               runAction(getColumns(TestTable))
                 .map(c => c.name -> c)
