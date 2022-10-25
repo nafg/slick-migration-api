@@ -1,3 +1,11 @@
+import _root_.io.github.nafg.mergify.dsl._
+
+
+mergifyExtraConditions := Seq(
+  (Attr.Author :== "scala-steward") ||
+    (Attr.Author :== "nafg-scala-steward[bot]")
+)
+
 inThisBuild(List(
   homepage := Some(url("https://github.com/nafg/slick-migration-api")),
   licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
