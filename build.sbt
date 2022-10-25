@@ -19,7 +19,7 @@ libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.39.3.
 libraryDependencies += "org.apache.derby"    % "derby"                % "10.15.2.0" % "test"
 libraryDependencies += "org.apache.derby"    % "derbytools"           % "10.15.2.0" % "test"
 
-libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.0"     % "test"
+libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.1"     % "test"
 
 libraryDependencies += "org.postgresql"      % "postgresql"           % "42.5.0"    % "test"
 
