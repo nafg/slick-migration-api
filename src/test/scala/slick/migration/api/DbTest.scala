@@ -262,17 +262,9 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
     assert(reversed.sql(1).contains("STR_WITH_DEFAULT"))
     assert(reversed.sql(2).contains("drop table"))
 
-    try withBeforeAndAfter(reversed)(getTables) { (before, after) =>
-      // Only postgres can remove all columns from a table
-      if (this.profile.isInstanceOf[PostgresProfile]) {
-        assert(before.contains("TEST_TABLE"))
-        assert(!after.contains("TEST_TABLE"))
-      }
-    } catch {
-      case _: Throwable =>
-        if (!this.profile.isInstanceOf[PostgresProfile]) {
-          runMigration(tm.drop)
-        }
+    withBeforeAndAfter(reversed)(getTables) { (before, after) =>
+      assert(before.contains("TEST_TABLE"))
+      assert(!after.contains("TEST_TABLE"))
     }
   }
 }
