@@ -7,7 +7,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
-import slick.jdbc.{HsqldbProfile, JdbcProfile, OracleProfile, PostgresProfile}
+import slick.jdbc.{HsqldbProfile, JdbcProfile, OracleProfile}
 import slick.jdbc.meta._
 import slick.lifted.AbstractTable
 import com.typesafe.slick.testkit.util.JdbcTestDB
