@@ -257,14 +257,12 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
     val reversed = createTable.reverse
 
-    assert(reversed.sql.size === 3)
-    assert(reversed.sql.head.contains("ID"))
-    assert(reversed.sql(1).contains("STR_WITH_DEFAULT"))
-    assert(reversed.sql(2).contains("drop table"))
+    assert(reversed.sql.size === 1)
+    assert(reversed.sql.head.contains("drop table"))
 
     withBeforeAndAfter(reversed)(getTables) { (before, after) =>
-      assert(before.contains("TEST_TABLE"))
-      assert(!after.contains("TEST_TABLE"))
+      assert(before.map(_.name.name).contains("TEST_TABLE"))
+      assert(!after.map(_.name.name).contains("TEST_TABLE"))
     }
   }
 }
