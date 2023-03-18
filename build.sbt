@@ -21,7 +21,7 @@ libraryDependencies += "org.apache.derby"    % "derbytools"           % "10.15.2
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.1"     % "test"
 
-libraryDependencies += "org.postgresql"      % "postgresql"           % "42.5.4"    % "test"
+libraryDependencies += "org.postgresql"      % "postgresql"           % "42.6.0"    % "test"
 
 libraryDependencies += "mysql"               % "mysql-connector-java" % "8.0.32"    % "test"
 
