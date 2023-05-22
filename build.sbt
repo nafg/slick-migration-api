@@ -14,7 +14,7 @@ libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.16"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "2.1.214"   % "test"
 
-libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.41.2.2"    % "test" // latest version that works
+libraryDependencies += "org.xerial"          % "sqlite-jdbc"          % "3.42.0.0"    % "test" // latest version that works
 
 libraryDependencies += "org.apache.derby"    % "derby"                % "10.15.2.0" % "test"
 libraryDependencies += "org.apache.derby"    % "derbytools"           % "10.15.2.0" % "test"
