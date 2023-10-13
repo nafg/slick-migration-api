@@ -42,7 +42,7 @@ case class ColumnInfo(name: String, sqlType: String, notNull: Boolean, autoInc: 
  */
 case class IndexInfo(table: TableNode, name: String, unique: Boolean, columns: Seq[FieldSymbol])
 
-  case class PrimaryKeyInfo(name: String, columns: Seq[FieldSymbol])
+case class PrimaryKeyInfo(name: String, columns: Seq[FieldSymbol])
 }
 
 /**

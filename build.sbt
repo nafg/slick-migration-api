@@ -1,14 +1,14 @@
 inThisBuild(List(
-  crossScalaVersions := Seq("2.12.17", "2.13.10"),
+  crossScalaVersions := Seq("2.12.17", "3.3.1", "2.13.12"),
   scalaVersion := crossScalaVersions.value.last,
   organization := "io.github.nafg.slick-migration-api"
 ))
 
 name := "slick-migration-api"
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.4.1"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.0-M4"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.4.1"     % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.0-M4"     % "test"
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.17"     % "test"
 
@@ -29,6 +29,6 @@ libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "2.0.9" 
 
 (Compile / doc / scalacOptions) ++= Seq("-groups", "-implicits")
 
-scalacOptions ++= Seq("-feature", "-deprecation")
+scalacOptions ++= Seq("-feature", "-deprecation", "-Xsource:3")
 
 Test / testOptions += Tests.Argument("-oF")

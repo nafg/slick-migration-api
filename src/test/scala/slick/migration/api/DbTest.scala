@@ -22,11 +22,11 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
                                        (implicit protected val dialect: Dialect[P])
   extends AnyFunSuite with Inside with BeforeAndAfterAll with TypeCheckedTripleEquals {
 
-  lazy val database = tdb.createDB
+  lazy val database = tdb.createDB()
   lazy val session = database.createSession()
   lazy val sessionDB = tdb.createSingleSessionDatabase(session)
 
-  lazy val profile: P = tdb.profile
+  val profile: P = tdb.profile
 
   import profile.api._
 

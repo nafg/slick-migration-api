@@ -10,9 +10,10 @@ import slick.jdbc.GetResult._
 import slick.jdbc._
 import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
 import org.scalatest.Ignore
-import slick.dbio.{DBIOAction, Effect, NoStream}
+import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.meta.{MColumn, MTable}
 import slick.lifted.{AbstractTable, TableQuery}
+import slick.model.ForeignKeyAction
 
 
 object Dialects {
@@ -31,7 +32,7 @@ trait DialectTestDB { this: JdbcTestDB =>
 }
 
 class H2TestDB(name: String) extends InternalJdbcTestDB(name) with DialectTestDB {
-  override val profile = H2Profile
+  override val profile: H2Profile.type = H2Profile
   val url = "jdbc:h2:mem:test1"
   val jdbcDriver = "org.h2.Driver"
   override def isPersistent = false
@@ -39,7 +40,7 @@ class H2TestDB(name: String) extends InternalJdbcTestDB(name) with DialectTestDB
 }
 
 class H2Test extends DbTest(new H2TestDB("h2mem")) with CompleteDbTest {
-  override val noActionReturns = slick.model.ForeignKeyAction.Restrict
+  override val noActionReturns: ForeignKeyAction = slick.model.ForeignKeyAction.Restrict
   override val longJdbcType = java.sql.Types.INTEGER
 }
 
@@ -48,11 +49,11 @@ class HsqldbTest extends DbTest(new HsqlDB("hsqldbmem") {
   val url = "jdbc:hsqldb:mem:"+dbName+";user=SA;password=;shutdown=true"
   override def isPersistent = false
 }) with CompleteDbTest {
-  override val catalog = None
-  override val schema = Some("PUBLIC")
+  override val catalog: Option[String] = None
+  override val schema: Option[String] = Some("PUBLIC")
 }
 
-class SqliteTest extends DbTest[SQLiteProfile](new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
+class SqliteTest extends DbTest(new SQLiteTestDB("jdbc:sqlite::memory:", "sqlitemem") {
   override def isPersistent = false
   override def isShared = false
 }) {
@@ -75,34 +76,34 @@ class DerbyTest extends DbTest(new DerbyDB("derbymem") {
     }
   }
 }) with CompleteDbTest {
-  override val catalog = None
-  override val schema = Some("APP")
+  override val catalog: Option[String] = None
+  override val schema: Option[String] = Some("APP")
 }
 
 class MySQLTest extends DbTest(new ExternalJdbcTestDB("mysql") {
-  override val profile = MySQLProfile
+  override val profile: MySQLProfile.type = MySQLProfile
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
-  override val noActionReturns = slick.model.ForeignKeyAction.Restrict
-  override val catalog = Some(tdb.confString("testDB"))
+  override val noActionReturns: ForeignKeyAction = slick.model.ForeignKeyAction.Restrict
+  override val catalog: Option[String] = Some(tdb.confString("testDB"))
   override def columnDefaultFormat(s: String) = s
   override def getTables =
     super.getTables.map(_.filterNot(_.name.name == "sys_config"))
 }
 
 class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
-  override val profile = PostgresProfile
-  override def localTables(implicit ec: ExecutionContext) = {
+  override val profile: PostgresProfile.type = PostgresProfile
+  override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
     val tables = ResultSetAction[(String,String,String, String)](_.conn.getMetaData.getTables("", "public", null, null))
     tables.map(_.filter(_._4.toUpperCase == "TABLE").map(_._3).sorted)
   }
-  override def localSequences(implicit ec: ExecutionContext) =
+  override def localSequences(implicit ec: ExecutionContext): DBIO[Vector[String]] =
     ResultSetAction[(String, String, String, String)](_.conn.getMetaData.getTables("", "public", null, null)).map { ts =>
       ts.filter(_._4.toUpperCase == "SEQUENCE").map(_._3).sorted
     }
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
-  override val schema = Some("public")
+  override val schema: Option[String] = Some("public")
   override def columnDefaultFormat(s: String) = s"'$s'::character varying"
 }
 
@@ -119,9 +120,8 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
 // * Run 'sbt testOnly *OracleTest'
 @Ignore
 class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
-  val profile = OracleProfile
+  override val profile: OracleProfile.type = OracleProfile
   import profile.api.actionBasedSQLInterpolation
-  import profile.api._
 
   override def canGetLocalTables = false
   override def capabilities =
@@ -137,7 +137,7 @@ class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
     sql"select sequence_Name from user_sequences".as[String]
   }
 
-  override def dropUserArtifacts(implicit session: profile.Backend#Session) =
+  override def dropUserArtifacts(implicit session: profile.backend.Session) =
     blockingRunOnSession { implicit ec =>
       for {
         tables <- localTables
@@ -149,7 +149,7 @@ class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
 }) with CompleteDbTest {
   override val longJdbcType: Int = java.sql.Types.DECIMAL
   override val dateJdbcType: Int = java.sql.Types.TIMESTAMP
-  override val noActionReturns = slick.model.ForeignKeyAction.Cascade
+  override val noActionReturns: ForeignKeyAction = slick.model.ForeignKeyAction.Cascade
 
   override val schema: Option[String] = Some("SLICKTEST") // from testkit.conf
 
@@ -164,9 +164,9 @@ class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
 }
 
 abstract class HsqlDB(confName: String) extends InternalJdbcTestDB(confName) {
-  override val profile = HsqldbProfile
+  override val profile: HsqldbProfile.type = HsqldbProfile
   val jdbcDriver = "org.hsqldb.jdbcDriver"
-  override def localTables(implicit ec: ExecutionContext) = {
+  override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
     val tables = ResultSetAction[(String,String,String)](_.conn.getMetaData.getTables(null, "PUBLIC", null, null))
     tables.map(_.map(_._3).sorted)
   }
@@ -181,7 +181,7 @@ abstract class HsqlDB(confName: String) extends InternalJdbcTestDB(confName) {
 }
 
 class SQLiteTestDB(dbUrl: String, confName: String) extends InternalJdbcTestDB(confName) {
-  override val profile = SQLiteProfile
+  override val profile: SQLiteProfile.type = SQLiteProfile
   val url = dbUrl
   val jdbcDriver = "org.sqlite.JDBC"
   override def localTables(implicit ec: ExecutionContext) =
@@ -190,10 +190,10 @@ class SQLiteTestDB(dbUrl: String, confName: String) extends InternalJdbcTestDB(c
 }
 
 abstract class DerbyDB(confName: String) extends InternalJdbcTestDB(confName) {
-  override val profile = DerbyProfile
+  override val profile: DerbyProfile.type = DerbyProfile
   System.setProperty("derby.stream.error.method", classOf[DerbyDB].getName + ".DEV_NULL")
   val jdbcDriver = "org.apache.derby.jdbc.EmbeddedDriver"
-  override def localTables(implicit ec: ExecutionContext) = {
+  override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
     val tables = ResultSetAction[(String,String,String)](_.conn.getMetaData.getTables(null, "APP", null, null))
     tables.map(_.map(_._3).sorted)
   }
