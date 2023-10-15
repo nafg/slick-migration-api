@@ -14,3 +14,9 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     ports:
       - "33060:3306"
+
+  oracle:
+    image: oracleinanutshell/oracle-xe-11g
+    ports:
+      - "49160:22"
+      - "49161:1521"
