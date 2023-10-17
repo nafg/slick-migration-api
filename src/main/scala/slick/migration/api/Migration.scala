@@ -24,11 +24,11 @@ object Migration {
   }
 
   def empty: Migration = new Migration {
-    override def apply() = DBIO.successful(())
+    override def apply(): DBIO[Unit] = DBIO.successful(())
   }
 
   def apply(action: => DBIO[Unit]): Migration = new Migration {
-    override def apply() = action
+    override def apply(): DBIO[Unit] = action
   }
 
 }

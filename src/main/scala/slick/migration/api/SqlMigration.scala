@@ -1,5 +1,6 @@
 package slick.migration.api
 
+import slick.dbio.DBIO
 import slick.jdbc.SimpleJdbcAction
 import slick.sql
 
@@ -15,7 +16,7 @@ trait SqlMigration extends Migration {
    */
   def sql: Seq[String]
 
-  def apply() = SimpleJdbcAction { ctx =>
+  def apply(): DBIO[Unit] = SimpleJdbcAction { ctx =>
     for (str <- sql)
       ctx.session.withPreparedStatement(str)(_.execute())
   }
