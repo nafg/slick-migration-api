@@ -6,11 +6,11 @@ inThisBuild(List(
 
 name := "slick-migration-api"
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.0-M5"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.0-RC1"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.0-M5"     % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.0-RC1"     % "test"
 
-libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.17"     % "test"
+libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.18"     % "test"
 
 libraryDependencies += "com.h2database"      % "h2"                   % "2.2.224"   % "test"
 
@@ -21,11 +21,11 @@ libraryDependencies += "org.apache.derby"    % "derbytools"           % "10.15.2
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.2"     % "test"
 
-libraryDependencies += "org.postgresql"      % "postgresql"           % "42.7.1"    % "test"
+libraryDependencies += "org.postgresql"      % "postgresql"           % "42.7.2"    % "test"
 
 libraryDependencies += "com.mysql"               % "mysql-connector-j" % "8.3.0"    % "test"
 
-libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "2.0.11"    % "test"
+libraryDependencies += "org.slf4j"           % "slf4j-simple"         % "2.0.12"    % "test"
 
 (Compile / doc / scalacOptions) ++= Seq("-groups", "-implicits")
 
