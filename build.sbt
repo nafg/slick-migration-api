@@ -6,9 +6,9 @@ inThisBuild(List(
 
 name := "slick-migration-api"
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.0-M5"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.0-RC1"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.0-M5"     % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.0-RC1"     % "test"
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.18"     % "test"
 
@@ -21,7 +21,7 @@ libraryDependencies += "org.apache.derby"    % "derbytools"           % "10.15.2
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.2"     % "test"
 
-libraryDependencies += "org.postgresql"      % "postgresql"           % "42.7.1"    % "test"
+libraryDependencies += "org.postgresql"      % "postgresql"           % "42.7.2"    % "test"
 
 libraryDependencies += "com.mysql"               % "mysql-connector-j" % "8.3.0"    % "test"
 
