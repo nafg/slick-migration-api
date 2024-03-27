@@ -19,7 +19,7 @@ class MigrationSeqTest extends AnyFunSuite with Matchers {
     seq should equal (MigrationSeq(s1, s2, s3))
 
     val rm: ReversibleMigration = new ReversibleMigration {
-      override def apply() = DBIO.successful(())
+      override def apply(): DBIO[Unit] = DBIO.successful(())
       def reverse: ReversibleMigration = this
     }
 

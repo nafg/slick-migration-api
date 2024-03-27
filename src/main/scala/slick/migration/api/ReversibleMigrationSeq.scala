@@ -9,5 +9,5 @@ class ReversibleMigrationSeq(override val migrations: ReversibleMigration*)
    * @return the reverse [[MigrationSeq]]: Each migration will be reversed, and
    *         they will be in the reverse order.
    */
-  def reverse = MigrationSeq(migrations.reverse.map(_.reverse): _*)
+  def reverse: MigrationSeq = MigrationSeq(migrations.reverse.map(_.reverse): _*)
 }

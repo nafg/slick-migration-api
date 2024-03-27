@@ -61,7 +61,7 @@ object TableMigration {
   implicit class Reversible[T <: JdbcProfile#Table[_]](val underlying: TableMigration[T, Action.Reversible])
     extends ReversibleMigration with SqlMigration {
     override def sql = underlying.sql
-    override def reverse = {
+    override def reverse: TableMigration[T, Action] = {
       val tm0 = underlying.modActions(_ => List.empty[Action])
       underlying.actions.foldLeft(tm0) { (tm, action) =>
         action match {
@@ -113,7 +113,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
 
   protected def columnInfo: (T => Rep[_]) => ColumnInfo = colInfo(table)
 
-  def sql = dialect.migrateTable(tableInfo, actions)
+  def sql: Seq[String] = dialect.migrateTable(tableInfo, actions)
 
   /**
    * Create the table.
@@ -152,7 +152,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def addColumns(cols: (T => Rep[_])*) =
-    modActions(withActions(cols.map(columnInfo andThen Action.AddColumn)))
+    modActions(withActions(cols.map(columnInfo andThen Action.AddColumn.apply)))
 
   /**
    * @note `rawSqlExpr` is used as raw SQL, with the security implications thereof
@@ -174,10 +174,10 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def dropColumns(cols: (T => Rep[_])*) =
-    modActions(withActions(cols.map(columnInfo andThen Action.DropColumn)))
+    modActions(withActions(cols.map(columnInfo andThen Action.DropColumn.apply)))
 
   def dropColumns(name: String, names: String*) =
-    modActions(withActions((name +: names).map(Action.DropColumnOfName)))
+    modActions(withActions((name +: names).map(Action.DropColumnOfName.apply)))
 
   /**
    * Rename a column.
@@ -200,7 +200,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def alterColumnTypes(cols: (T => Rep[_])*) =
-    modActions(withActions(cols.map(columnInfo andThen Action.AlterColumnType)))
+    modActions(withActions(cols.map(columnInfo andThen Action.AlterColumnType.apply)))
 
   /**
    * Changes the default value of columns based on the column definitions in `cols`
@@ -210,7 +210,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def alterColumnDefaults(cols: (T => Rep[_])*) =
-    modActions(withActions(cols.map(columnInfo andThen Action.AlterColumnDefault)))
+    modActions(withActions(cols.map(columnInfo andThen Action.AlterColumnDefault.apply)))
 
   /**
    * Changes the nullability of columns based on the column definitions in `cols`
@@ -220,7 +220,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def alterColumnNulls(cols: (T => Rep[_])*) =
-    modActions(withActions(cols.map(columnInfo andThen Action.AlterColumnNullable)))
+    modActions(withActions(cols.map(columnInfo andThen Action.AlterColumnNullable.apply)))
 
   private def pkInfo: (T => PrimaryKey) => PrimaryKeyInfo = { f =>
     val key = f(table)
@@ -235,7 +235,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def addPrimaryKeys(pks: (T => PrimaryKey)*) =
-    modActions(withActions(pks.map(pkInfo andThen Action.AddPrimaryKey)))
+    modActions(withActions(pks.map(pkInfo andThen Action.AddPrimaryKey.apply)))
 
   /**
    * Drops primary key constraints.
@@ -245,7 +245,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def dropPrimaryKeys(pks: (T => PrimaryKey)*) =
-    modActions(withActions(pks.map(pkInfo andThen Action.DropPrimaryKey)))
+    modActions(withActions(pks.map(pkInfo andThen Action.DropPrimaryKey.apply)))
 
   /**
    * Adds foreign key constraints.
@@ -255,7 +255,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def addForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: AbstractTable[_], _])*) =
-    modActions(withActions(fkqs.flatMap(_.apply(table).fks.map(Action.AddForeignKey))))
+    modActions(withActions(fkqs.flatMap(_.apply(table).fks.map(Action.AddForeignKey.apply))))
 
   /**
    * Drops foreign key constraints.
@@ -265,7 +265,7 @@ case class TableMigration[T <: JdbcProfile#Table[_], A <: Action](tableInfo: Tab
    * @group oper
    */
   def dropForeignKeys(fkqs: (T => ForeignKeyQuery[_ <: AbstractTable[_], _])*) =
-    modActions(withActions(fkqs.flatMap(_.apply(table).fks.map(Action.DropForeignKey))))
+    modActions(withActions(fkqs.flatMap(_.apply(table).fks.map(Action.DropForeignKey.apply))))
 
   /**
    * Adds indexes
