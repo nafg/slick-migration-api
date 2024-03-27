@@ -1,4 +1,4 @@
-import _root_.io.github.nafg.mergify.dsl._
+import _root_.io.github.nafg.mergify.dsl.*
 
 
 mergifyExtraConditions := Seq(
@@ -14,6 +14,7 @@ inThisBuild(List(
   ),
   dynverGitDescribeOutput ~= (_.map(o => o.copy(dirtySuffix = sbtdynver.GitDirtySuffix("")))),
   dynverSonatypeSnapshots := true,
+  githubWorkflowJavaVersions := Seq(JavaSpec.temurin("11")),
   githubWorkflowTargetTags ++= Seq("v*"),
   githubWorkflowBuild := Seq(
     WorkflowStep.Run(List("docker-compose up -d mysql postgres"), name = Some("Start databases")),
