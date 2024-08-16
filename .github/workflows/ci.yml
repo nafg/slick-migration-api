@@ -44,7 +44,7 @@ jobs:
         run: sbt '++ ${{ matrix.scala }}' githubWorkflowCheck
 
       - name: Start databases
-        run: docker-compose up -d mysql postgres
+        run: docker compose up -d mysql postgres
 
       - name: Build project
         run: sbt '++ ${{ matrix.scala }}' -Dslick.testkit-config=test-dbs/testkit-github.conf test
