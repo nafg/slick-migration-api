@@ -6,9 +6,9 @@ inThisBuild(List(
 
 name := "slick-migration-api"
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.1"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.5.2"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.1"     % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.5.2"     % "test"
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.19"     % "test"
 
