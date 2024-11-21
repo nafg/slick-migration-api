@@ -154,8 +154,10 @@ class Dialect[-P <: JdbcProfile] extends AstHelpers {
       case RenameTableFrom(from) :: rest                   => renameTable(table.copy(tableName = from), table.tableName) :: loop(rest)
       case AddColumn(info) :: rest                         => addColumn(table, info) :: loop(rest)
       case AddColumnAndSetInitialValue(info, expr) :: rest => addColumnWithInitialValue(table, info, expr) ::: loop(rest)
-      case DropColumn(info) :: rest                        => dropColumn(table, info.name) ::: loop(rest)
-      case DropColumnOfName(name) :: rest                  => dropColumn(table, name) ::: loop(rest)
+      case DropColumn(info) :: rest                        =>
+        (if (rest contains DropTable) Nil else dropColumn(table, info.name)) ::: loop(rest)
+      case DropColumnOfName(name) :: rest                  =>
+        (if (rest contains DropTable) Nil else dropColumn(table, name)) ::: loop(rest)
       case RenameColumnTo(originalInfo, to) :: rest        => renameColumn(table, originalInfo, to) :: loop(rest)
       case RenameColumnFrom(currentInfo, from) :: rest     => renameColumn(table, from, currentInfo.name) :: loop(rest)
       case AlterColumnDefault(info) :: rest                => alterColumnDefault(table, info) :: loop(rest)
