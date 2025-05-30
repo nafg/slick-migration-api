@@ -1,14 +1,14 @@
 inThisBuild(List(
-  crossScalaVersions := Seq("2.12.20", "2.13.15", "3.5.1"),
+  crossScalaVersions := Seq("2.12.20", "2.13.16", "3.5.2"),
   scalaVersion := crossScalaVersions.value.last,
   organization := "io.github.nafg.slick-migration-api"
 ))
 
 name := "slick-migration-api"
 
-libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.6.0"
+libraryDependencies += "com.typesafe.slick" %% "slick"                % "3.6.1"
 
-libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.6.0"     % "test"
+libraryDependencies += "com.typesafe.slick" %% "slick-testkit"        % "3.6.1"     % "test"
 
 libraryDependencies += "org.scalatest"      %% "scalatest"            % "3.2.19"     % "test"
 
@@ -21,7 +21,7 @@ libraryDependencies += "org.apache.derby"    % "derbytools"           % "10.15.2
 
 libraryDependencies += "org.hsqldb"          % "hsqldb"               % "2.7.4"     % "test"
 
-libraryDependencies += "org.postgresql"      % "postgresql"           % "42.7.4"    % "test"
+libraryDependencies += "org.postgresql"      % "postgresql"           % "42.7.5"    % "test"
 
 libraryDependencies += "com.mysql"               % "mysql-connector-j" % "9.3.0"    % "test"
 
