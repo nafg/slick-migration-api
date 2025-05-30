@@ -7,15 +7,17 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
+
+import slick.jdbc.meta.*
 import slick.jdbc.{HsqldbProfile, JdbcProfile, OracleProfile}
-import slick.jdbc.meta._
 import slick.lifted.AbstractTable
+
 import com.typesafe.slick.testkit.util.JdbcTestDB
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalactic.source.Position
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.{BeforeAndAfterAll, Inside}
 
 
 abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
@@ -28,7 +30,8 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
   val profile: P = tdb.profile
 
-  import profile.api._
+  import profile.api.*
+
 
   override def beforeAll(): Unit = tdb.cleanUpBefore()
   override def afterAll(): Unit = {
@@ -63,7 +66,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         }
     }
 
-  def getTable[E <: AbstractTable[_]](table: TableQuery[E])(implicit pos: Position): DBIO[MTable] =
+  def getTable[E <: AbstractTable[?]](table: TableQuery[E])(implicit pos: Position): DBIO[MTable] =
     getTable(table.baseTableRow.tableName)
 
   val longJdbcType = Types.BIGINT
@@ -86,7 +89,7 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
       } yield f(before, after)
     }
 
-  def getColumns[E <: AbstractTable[_]](table: TableQuery[E]): DBIO[Vector[MColumn]] =
+  def getColumns[E <: AbstractTable[?]](table: TableQuery[E]): DBIO[Vector[MColumn]] =
     getTable(table).flatMap(_.getColumns)
 
 
@@ -158,10 +161,10 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
       runAction(TestTable.map(_.strWithDefault) += "row 1")
       runAction(TestTable.map(_.strWithDefault) += "row 2")
 
-        profile match {
-          case _: HsqldbProfile => assert(runAction(TestTable.result).toSet === Set(0L, 1L))
-          case _                => assert(runAction(TestTable.result).toSet === Set(1L, 2L))
-        }
+      profile match {
+        case _: HsqldbProfile => assert(runAction(TestTable.result).toSet === Set(0L, 1L))
+        case _                => assert(runAction(TestTable.result).toSet === Set(1L, 2L))
+      }
     } finally
       runMigration(tm.drop)
   }
@@ -187,7 +190,8 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
 
     def indexes =
       getTable(TestTable).flatMap(_.getIndexInfo())
-        .map(_.groupBy(i => (i.indexName, !i.nonUnique)).transform((_, is) => is.sortBy(_.ordinalPosition).map(_.column)))
+        .map(_.groupBy(i => (i.indexName, !i.nonUnique)).transform((_, is) => is.sortBy(_.ordinalPosition).map(_
+          .column)))
 
     val tm = TableMigration(TestTable)
     val createIndexes = tm.addIndexes(_.index1, _.index2)
@@ -247,8 +251,10 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
   }
 }
 
-trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
-  import profile.api._
+trait CompleteDbTest { this: DbTest[? <: JdbcProfile] =>
+
+  import profile.api.*
+
 
   test("addPrimaryKeys, dropPrimaryKeys") {
     def pks =
@@ -288,7 +294,8 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
     try
       withBeforeAndAfter(createForeignKey)(tableFks) { (fks2, fks3) =>
         inside(fks3(TestTable.baseTableRow.tableName)) {
-          case Vector(MForeignKey(_, "ID", MQName(_, _, "TEST_TABLE"), "OTHER", _, `noActionReturns`, ForeignKeyAction.Cascade, Some("FK_OTHER"), _, _)) =>
+          case Vector(MForeignKey(_, "ID", MQName(_, _, "TEST_TABLE"), "OTHER", _, `noActionReturns`,
+          ForeignKeyAction.Cascade, Some("FK_OTHER"), _, _)) =>
         }
 
         assertResult(TestTable.baseTableRow.fk.fks.toList) {
@@ -355,7 +362,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
       withBeforeAndAfter(tm.alterColumnDefaults(_.strWithDefault))(getColumns(TestTable)) { (before, after) =>
         assert(before.map(_.columnDef) === Vector(None))
         assert(after.map(_.columnDef) === Vector(Some(columnDefaultFormat("abc"))))
-    } finally
+      } finally
       runMigration(tm.drop)
   }
 
@@ -383,7 +390,7 @@ trait CompleteDbTest { this: DbTest[_ <: JdbcProfile] =>
       withBeforeAndAfter(tm.renameColumn(_.int1, "OTHER_NAME"))(getColumns(TestTable)) { (before, after) =>
         assert(before.map(_.name) === Vector("INT1"))
         assert(after.map(_.name) === Vector("OTHER_NAME"))
-    } finally
+      } finally
       runMigration(tm.drop)
 
     assert(tm.renameColumn(_.int1, "other_name").reverse == tm.renameColumnFrom("other_name", _.int1))

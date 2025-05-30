@@ -13,15 +13,16 @@ class CanConcatMigrations[-A, -B, +C](val f: (A, B) => C)
 class CanConcatMigrationsLow {
   implicit def default[A <: Migration, B <: Migration]: CanConcatMigrations[A, B, MigrationSeq] =
     new CanConcatMigrations({
-      case (MigrationSeq(as @ _*), b) => MigrationSeq(as :+ b: _*)
-      case (a, b)                     => MigrationSeq(a, b)
+      case (MigrationSeq(as*), b) => MigrationSeq((as :+ b) *)
+      case (a, b)                 => MigrationSeq(a, b)
     })
 }
 object CanConcatMigrations extends CanConcatMigrationsLow {
   implicit def reversible[A <: Migration, B <: Migration](implicit reverseA: ToReversible[A],
-                                                          reverseB: ToReversible[B]): CanConcatMigrations[A, B, ReversibleMigrationSeq] =
+                                                          reverseB: ToReversible[B]): CanConcatMigrations[A, B,
+    ReversibleMigrationSeq] =
     new CanConcatMigrations({
-      case (rms: ReversibleMigrationSeq, b) => new ReversibleMigrationSeq(rms.migrations :+ reverseB.func(b): _*)
+      case (rms: ReversibleMigrationSeq, b) => new ReversibleMigrationSeq((rms.migrations :+ reverseB.func(b)) *)
       case (a, b)                           => new ReversibleMigrationSeq(reverseA.func(a), reverseB.func(b))
     })
 }
