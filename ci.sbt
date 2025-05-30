@@ -18,7 +18,7 @@ inThisBuild(List(
   githubWorkflowScalaVersions := githubWorkflowScalaVersions.value.map(_.replaceFirst("\\d+$", "x")),
   githubWorkflowTargetTags ++= Seq("v*"),
   githubWorkflowBuild := Seq(
-    WorkflowStep.Run(List("docker compose up -d mysql postgres"), name = Some("Start databases")),
+    WorkflowStep.Run(List("docker compose up -d"), name = Some("Start databases")),
     WorkflowStep.Sbt(List("-Dslick.testkit-config=test-dbs/testkit-github.conf", "test"), name = Some("Build project"))
   ),
   githubWorkflowPublishTargetBranches := Seq(RefPredicate.StartsWith(Ref.Tag("v"))),
