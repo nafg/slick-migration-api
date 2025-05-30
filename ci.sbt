@@ -15,6 +15,7 @@ inThisBuild(List(
   dynverGitDescribeOutput ~= (_.map(o => o.copy(dirtySuffix = sbtdynver.GitDirtySuffix("")))),
   dynverSonatypeSnapshots := true,
   githubWorkflowJavaVersions := Seq(JavaSpec.temurin("11")),
+  githubWorkflowScalaVersions := githubWorkflowScalaVersions.value.map(_.replaceFirst("\\d+$", "x")),
   githubWorkflowTargetTags ++= Seq("v*"),
   githubWorkflowBuild := Seq(
     WorkflowStep.Run(List("docker compose up -d mysql postgres"), name = Some("Start databases")),
