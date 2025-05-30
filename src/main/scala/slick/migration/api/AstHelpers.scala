@@ -1,9 +1,9 @@
 package slick
 package migration.api
 
-import slick.ast.{ FieldSymbol, Node, Select, TableNode }
+import slick.ast.{FieldSymbol, Node, Select, TableNode}
 import slick.jdbc.JdbcProfile
-import slick.lifted.{ Rep, Index }
+import slick.lifted.{Index, Rep}
 import slick.relational.RelationalProfile
 import slick.sql.SqlProfile
 
@@ -50,7 +50,7 @@ case class PrimaryKeyInfo(name: String, columns: Seq[FieldSymbol])
  */
 private [api] trait AstHelpers {
 
-  import AstHelpers._
+  import AstHelpers.*
 
   /**
    * @param table a Slick table object whose qualified name is needed
@@ -74,9 +74,9 @@ private [api] trait AstHelpers {
    */
   protected def columnInfo(driver: JdbcProfile, column: FieldSymbol): ColumnInfo = {
 
-    import ast.{ ColumnOption => AColumnOption }
-    import RelationalProfile.{ ColumnOption => RColumnOption }
-    import SqlProfile.{ ColumnOption => SColumnOption }
+    import RelationalProfile.ColumnOption as RColumnOption
+    import SqlProfile.ColumnOption as SColumnOption
+    import ast.ColumnOption as AColumnOption
 
     column.tpe match {
       case driver.JdbcType(ti, isOpt) =>
@@ -114,7 +114,7 @@ private [api] trait AstHelpers {
     )
   }
 
-  protected def colInfo[T <: JdbcProfile#Table[_]](table: T)(f: T => Rep[_]): ColumnInfo = {
+  protected def colInfo[T <: JdbcProfile#Table[?]](table: T)(f: T => Rep[?]): ColumnInfo = {
     val col = f(table)
     fieldSym(col.toNode) match {
       case Some(c) =>

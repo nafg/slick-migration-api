@@ -5,28 +5,31 @@ import java.sql.SQLException
 import java.util.logging.{Level, Logger}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.{global => ec}
-import slick.jdbc.GetResult._
-import slick.jdbc._
-import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
-import org.scalatest.Ignore
+import scala.concurrent.ExecutionContext.Implicits.global as ec
+
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
+import slick.jdbc.*
+import slick.jdbc.GetResult.*
 import slick.jdbc.meta.{MColumn, MTable}
 import slick.lifted.{AbstractTable, TableQuery}
 import slick.model.ForeignKeyAction
 
+import com.typesafe.slick.testkit.util.{ExternalJdbcTestDB, InternalJdbcTestDB, JdbcTestDB, TestDB}
+import org.scalatest.Ignore
+
 
 object Dialects {
-  implicit def derby   : Dialect[DerbyProfile   ] = new DerbyDialect
-  implicit def h2      : Dialect[H2Profile      ] = new H2Dialect
-  implicit def sqlite  : Dialect[SQLiteProfile  ] = new SQLiteDialect
-  implicit def hsqldb  : Dialect[HsqldbProfile  ] = new HsqldbDialect
-  implicit def mysql   : Dialect[MySQLProfile   ] = new MySQLDialect
+  implicit def derby: Dialect[DerbyProfile] = new DerbyDialect
+  implicit def h2: Dialect[H2Profile] = new H2Dialect
+  implicit def sqlite: Dialect[SQLiteProfile] = new SQLiteDialect
+  implicit def hsqldb: Dialect[HsqldbProfile] = new HsqldbDialect
+  implicit def mysql: Dialect[MySQLProfile] = new MySQLDialect
   implicit def postgres: Dialect[PostgresProfile] = new PostgresDialect
-  implicit def oracle  : Dialect[OracleProfile  ] = new OracleDialect
+  implicit def oracle: Dialect[OracleProfile] = new OracleDialect
 }
 
-import slick.migration.api.Dialects._
+import slick.migration.api.Dialects.*
+
 
 trait DialectTestDB { this: JdbcTestDB =>
 }
@@ -46,7 +49,7 @@ class H2Test extends DbTest(new H2TestDB("h2mem")) with CompleteDbTest {
 
 class HsqldbTest extends DbTest(new HsqlDB("hsqldbmem") {
   val dbName = "test1"
-  val url = "jdbc:hsqldb:mem:"+dbName+";user=SA;password=;shutdown=true"
+  val url = "jdbc:hsqldb:mem:" + dbName + ";user=SA;password=;shutdown=true"
   override def isPersistent = false
 }) with CompleteDbTest {
   override val catalog: Option[String] = None
@@ -94,12 +97,14 @@ class MySQLTest extends DbTest(new ExternalJdbcTestDB("mysql") {
 class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
   override val profile: PostgresProfile.type = PostgresProfile
   override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
-    val tables = ResultSetAction[(String,String,String, String)](_.conn.getMetaData.getTables("", "public", null, null))
+    val tables = ResultSetAction[(String, String, String, String)](_.conn.getMetaData.getTables("", "public", null,
+      null))
     tables.map(_.filter(_._4.toUpperCase == "TABLE").map(_._3).sorted)
   }
   override def localSequences(implicit ec: ExecutionContext): DBIO[Vector[String]] =
-    ResultSetAction[(String, String, String, String)](_.conn.getMetaData.getTables("", "public", null, null)).map { ts =>
-      ts.filter(_._4.toUpperCase == "SEQUENCE").map(_._3).sorted
+    ResultSetAction[(String, String, String, String)](_.conn.getMetaData.getTables("", "public", null, null)).map {
+      ts =>
+        ts.filter(_._4.toUpperCase == "SEQUENCE").map(_._3).sorted
     }
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }) with CompleteDbTest {
@@ -112,17 +117,21 @@ class PostgresTest extends DbTest(new ExternalJdbcTestDB("postgres") {
 
 // To test on Oracle:
 // * Install Oracle DB
-//   - manually from https://www.oracle.com/technetwork/database/database-technologies/express-edition/downloads/index.html
+//   - manually from https://www.oracle.com/technetwork/database/database-technologies/express-edition/downloads
+//   /index.html
 //   - or using Docker image: oracleinanutshell/oracle-xe-11g
 // * Correct connection config in '<project root>/test-dbs/testkit.conf' according to your DB config
-// * Download Oracle JDBC driver from https://www.oracle.com/technetwork/database/application-development/jdbc/downloads/index.html
+// * Download Oracle JDBC driver from https://www.oracle
+// .com/technetwork/database/application-development/jdbc/downloads/index.html
 // and put it into '<project root>/lib' directory
 // * Remove '@Ignore' below
 // * Run 'sbt testOnly *OracleTest'
 @Ignore
 class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
   override val profile: OracleProfile.type = OracleProfile
+
   import profile.api.actionBasedSQLInterpolation
+
 
   override def canGetLocalTables = false
   override def capabilities =
@@ -135,7 +144,7 @@ class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
 
   override def localSequences(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
     // user_sequences much quicker than going to metadata if you don't know the schema they are going to be in
-    sql"select sequence_Name from user_sequences".as[String]
+    sql"SELECT sequence_name FROM user_sequences".as[String]
   }
 
   override def dropUserArtifacts(implicit session: profile.backend.Session) =
@@ -143,8 +152,10 @@ class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
       for {
         tables <- localTables
         sequences <- localSequences
-        _ <- DBIO.seq(tables.map(t => sqlu"drop table #${profile.quoteIdentifier(t)} cascade constraints") ++
-                      sequences.map(s => sqlu"drop sequence #${profile.quoteIdentifier(s)}"): _*)
+        dropTablesStatements = tables.map(t => sqlu"drop table #${profile.quoteIdentifier(t)} cascade constraints")
+        dropSequenceStatements = sequences.map(s => sqlu"drop sequence #${profile.quoteIdentifier(s)}")
+        statements = dropTablesStatements ++ dropSequenceStatements
+        _ <- DBIO.seq(statements *)
       } yield ()
     }
 }) with CompleteDbTest {
@@ -154,11 +165,12 @@ class OracleTest extends DbTest(new ExternalJdbcTestDB("oracle") {
 
   override val schema: Option[String] = Some("SLICKTEST") // from testkit.conf
 
-  override def getTables: DBIOAction[Vector[MTable],NoStream,Effect.All] =
+  override def getTables: DBIOAction[Vector[MTable], NoStream, Effect.All] =
     MTable.getTables(Some(""), schema, None, Some(Seq("TABLE")))
 
   // fixes returning column default value with spaces at the end (driver issue?)
-  override def getColumns[E <: AbstractTable[_]](table: TableQuery[E]): DBIOAction[Vector[MColumn],NoStream,Effect.All] =
+  override def getColumns[E <: AbstractTable[?]](table: TableQuery[E]): DBIOAction[Vector[MColumn], NoStream, Effect
+  .All] =
     super.getColumns(table).map(_.map { c =>
       c.copy(columnDef = c.columnDef.map(_.trim))
     })
@@ -168,7 +180,7 @@ abstract class HsqlDB(confName: String) extends InternalJdbcTestDB(confName) {
   override val profile: HsqldbProfile.type = HsqldbProfile
   val jdbcDriver = "org.hsqldb.jdbcDriver"
   override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
-    val tables = ResultSetAction[(String,String,String)](_.conn.getMetaData.getTables(null, "PUBLIC", null, null))
+    val tables = ResultSetAction[(String, String, String)](_.conn.getMetaData.getTables(null, "PUBLIC", null, null))
     tables.map(_.map(_._3).sorted)
   }
   override def cleanUpBefore(): Unit = {
@@ -195,12 +207,14 @@ abstract class DerbyDB(confName: String) extends InternalJdbcTestDB(confName) {
   System.setProperty("derby.stream.error.method", classOf[DerbyDB].getName + ".DEV_NULL")
   val jdbcDriver = "org.apache.derby.jdbc.EmbeddedDriver"
   override def localTables(implicit ec: ExecutionContext): DBIO[Vector[String]] = {
-    val tables = ResultSetAction[(String,String,String)](_.conn.getMetaData.getTables(null, "APP", null, null))
+    val tables = ResultSetAction[(String, String, String)](_.conn.getMetaData.getTables(null, "APP", null, null))
     tables.map(_.map(_._3).sorted)
   }
   override lazy val capabilities = profile.capabilities + TestDB.capabilities.plainSql
 }
 
 object DerbyDB {
-  val DEV_NULL = new java.io.OutputStream { def write(b: Int): Unit = () }
+  val DEV_NULL = new java.io.OutputStream {
+    def write(b: Int): Unit = ()
+  }
 }
