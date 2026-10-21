@@ -2,8 +2,6 @@ Write typesafe and typo-safe database migrations, using your existing Slick tabl
 
 [![Pipeline Status](https://gitlab.com/io.github.nafg/slick-migration-api/badges/master/pipeline.svg)](https://gitlab.com/io.github.nafg/slick-migration-api/-/pipelines?ref=master)
 
-[![Coverage Status](https://img.shields.io/coveralls/nafg/slick-migration-api.svg)](https://coveralls.io/r/nafg/slick-migration-api?branch=master)
-
 ![Maven Central](https://img.shields.io/maven-central/v/io.github.nafg.slick-migration-api/slick-migration-api_2.13)
 
 ### Dependency
