@@ -43,7 +43,6 @@ class H2TestDB(name: String) extends InternalJdbcTestDB(name) with DialectTestDB
 }
 
 class H2Test extends DbTest(new H2TestDB("h2mem")) with CompleteDbTest {
-  override val noActionReturns: ForeignKeyAction = slick.model.ForeignKeyAction.Restrict
   override val longJdbcType = java.sql.Types.INTEGER
 }
 
