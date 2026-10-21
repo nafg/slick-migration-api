@@ -20,9 +20,12 @@ inThisBuild(List(
     case v                       => v.replaceFirst("\\d+$", "x")
   },
   githubWorkflowTargetTags ++= Seq("v*"),
+  // Workflow-wide: the sbt server that runs the tests is started by an earlier step,
+  // so a -D flag on the test step would not reach it
+  githubWorkflowEnv += "SLICK_TESTKIT_CONFIG" -> "test-dbs/testkit-github.conf",
   githubWorkflowBuild := Seq(
     WorkflowStep.Run(List("docker compose up -d mysql postgres"), name = Some("Start databases")),
-    WorkflowStep.Sbt(List("-Dslick.testkit-config=test-dbs/testkit-github.conf", "test"), name = Some("Build project"))
+    WorkflowStep.Sbt(List("test"), name = Some("Build project"))
   ),
   githubWorkflowPublishTargetBranches := Seq(RefPredicate.StartsWith(Ref.Tag("v"))),
   githubWorkflowPublish := Seq(
