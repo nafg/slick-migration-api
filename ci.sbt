@@ -7,10 +7,10 @@ mergifyExtraConditions := Seq(
 )
 
 inThisBuild(List(
-  homepage := Some(url("https://github.com/nafg/slick-migration-api")),
-  licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
+  homepage := Some(uri("https://github.com/nafg/slick-migration-api")),
+  licenses := List("Apache-2.0" -> uri("https://www.apache.org/licenses/LICENSE-2.0")),
   developers := List(
-    Developer("nafg", "Naftoli Gugenheim", "98384+nafg@users.noreply.github.com", url("https://github.com/nafg"))
+    Developer("nafg", "Naftoli Gugenheim", "98384+nafg@users.noreply.github.com", uri("https://github.com/nafg"))
   ),
   dynverGitDescribeOutput ~= (_.map(o => o.copy(dirtySuffix = sbtdynver.GitDirtySuffix("")))),
   dynverSonatypeSnapshots := true,
@@ -20,9 +20,12 @@ inThisBuild(List(
     case v                       => v.replaceFirst("\\d+$", "x")
   },
   githubWorkflowTargetTags ++= Seq("v*"),
+  // Workflow-wide: the sbt server that runs the tests is started by an earlier step,
+  // so a -D flag on the test step would not reach it
+  githubWorkflowEnv += "SLICK_TESTKIT_CONFIG" -> "test-dbs/testkit-github.conf",
   githubWorkflowBuild := Seq(
     WorkflowStep.Run(List("docker compose up -d mysql postgres"), name = Some("Start databases")),
-    WorkflowStep.Sbt(List("-Dslick.testkit-config=test-dbs/testkit-github.conf", "test"), name = Some("Build project"))
+    WorkflowStep.Sbt(List("test"), name = Some("Build project"))
   ),
   githubWorkflowPublishTargetBranches := Seq(RefPredicate.StartsWith(Ref.Tag("v"))),
   githubWorkflowPublish := Seq(
