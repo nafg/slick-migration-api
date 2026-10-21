@@ -249,6 +249,26 @@ abstract class DbTest[P <: JdbcProfile](val tdb: JdbcTestDB {val profile: P})
         runMigration(tm.drop)
     }
   }
+
+  test("reverse") {
+    val tm = TableMigration(TestTable)
+    val createTable = tm.create.addColumns(_.id, _.strWithDefault)
+
+    assert(createTable.sql.size === 1)
+    assert(createTable.sql.head.contains("create table"))
+
+    runMigration(createTable)
+
+    val reversed = createTable.reverse
+
+    assert(reversed.sql.size === 1)
+    assert(reversed.sql.head.contains("drop table"))
+
+    withBeforeAndAfter(reversed)(getTables) { (before, after) =>
+      assert(before.map(_.name.name).contains("TEST_TABLE"))
+      assert(!after.map(_.name.name).contains("TEST_TABLE"))
+    }
+  }
 }
 
 trait CompleteDbTest { this: DbTest[? <: JdbcProfile] =>
