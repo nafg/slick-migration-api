@@ -16,6 +16,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  SLICK_TESTKIT_CONFIG: test-dbs/testkit-github.conf
 
 jobs:
   build:
@@ -50,7 +51,7 @@ jobs:
         run: docker compose up -d mysql postgres
 
       - name: Build project
-        run: sbt -Dslick.testkit-config=test-dbs/testkit-github.conf '++ ${{ matrix.scala }}; test'
+        run: sbt '++ ${{ matrix.scala }}; test'
 
       - name: Compress target directories
         run: tar chf targets.tar target/out/jvm project/target
