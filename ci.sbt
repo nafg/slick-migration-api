@@ -15,7 +15,10 @@ inThisBuild(List(
   dynverGitDescribeOutput ~= (_.map(o => o.copy(dirtySuffix = sbtdynver.GitDirtySuffix("")))),
   dynverSonatypeSnapshots := true,
   githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17")),
-  githubWorkflowScalaVersions := githubWorkflowScalaVersions.value.map(_.replaceFirst("\\d+$", "x")),
+  githubWorkflowScalaVersions := githubWorkflowScalaVersions.value.map {
+    case v if v.startsWith("3.") => "3.x"
+    case v                       => v.replaceFirst("\\d+$", "x")
+  },
   githubWorkflowTargetTags ++= Seq("v*"),
   githubWorkflowBuild := Seq(
     WorkflowStep.Run(List("docker compose up -d mysql postgres"), name = Some("Start databases")),
